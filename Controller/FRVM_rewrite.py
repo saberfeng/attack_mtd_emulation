@@ -238,45 +238,49 @@ class FRVM(app_manager.RyuApp):
         datapath.send_msg(out)
     
     def get_actions(self, datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol):
-        if self.is_edge_port(datapath.id, in_port, protocol): # packet is from edge port
-            if self.is_edge_port(datapath.id, out_port, protocol): # packet is going to edge port
-                actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-            else:
-                new_src_ip, new_dst_ip = src_ip, dst_ip
-                # if source ip is host rip:
-                if find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[0]): # item->((rip, port), (vip, port))
-                    new_src_ip = self.rip_to_vip[(src_ip, src_port)][0] # change source rip to vip
-                # if dst ip is host rip:
-                if find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[0]): # item->((rip, port), (vip, port))
-                    new_dst_ip = self.rip_to_vip[(dst_ip, dst_port)][0] # change source rip to vip
-                
-                if protocol == Proto_IPv4:
-                    actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
-                               datapath.ofproto_parser.OFPActionOutput(out_port)]
-                elif protocol == Proto_ARP:
-                    actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
-                               datapath.ofproto_parser.OFPActionOutput(out_port)]
-        else: # packet is from non-edge port
-            if self.is_edge_port(datapath.id, out_port, protocol): # packet is going to edge port
-                new_src_ip, new_dst_ip = src_ip, dst_ip
-                # if source ip is host vip:
-                found_item = find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[1])
-                if found_item:
-                    new_src_ip = found_item[0][0] # change source vip to rip
-                # if dst ip is host vip:
-                found_item = find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[1])
-                if found_item:
-                    new_dst_ip = found_item[0][0] # change source vip to rip
+        from_edge_port = self.is_edge_port(datapath.id, in_port, protocol)
+        to_edge_port = self.is_edge_port(datapath.id, out_port, protocol)
 
-                if protocol == Proto_IPv4:
-                    actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
+        if from_edge_port and to_edge_port:
+            actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+            
+        elif not from_edge_port and not to_edge_port:
+            actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+
+        elif from_edge_port and not to_edge_port:
+            new_src_ip, new_dst_ip = src_ip, dst_ip
+            # if source ip is host rip:
+            if find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[0]): # item->((rip, port), (vip, port))
+                new_src_ip = self.rip_to_vip[(src_ip, src_port)][0] # change source rip to vip
+            # if dst ip is host rip:
+            if find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[0]): # item->((rip, port), (vip, port))
+                new_dst_ip = self.rip_to_vip[(dst_ip, dst_port)][0] # change source rip to vip
+            
+            if protocol == Proto_IPv4:
+                actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
                             datapath.ofproto_parser.OFPActionOutput(out_port)]
-                elif protocol == Proto_ARP:
-                    actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
-                           datapath.ofproto_parser.OFPActionOutput(out_port)]
-            else:
-                actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-            return actions
+            elif protocol == Proto_ARP:
+                actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
+                            datapath.ofproto_parser.OFPActionOutput(out_port)]
+
+        elif not from_edge_port and to_edge_port:
+            new_src_ip, new_dst_ip = src_ip, dst_ip
+            # if source ip is host vip:
+            found_item = find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[1])
+            if found_item:
+                new_src_ip = found_item[0][0] # change source vip to rip
+            # if dst ip is host vip:
+            found_item = find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[1])
+            if found_item:
+                new_dst_ip = found_item[0][0] # change source vip to rip
+
+            if protocol == Proto_IPv4:
+                actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
+                        datapath.ofproto_parser.OFPActionOutput(out_port)]
+            elif protocol == Proto_ARP:
+                actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
+                        datapath.ofproto_parser.OFPActionOutput(out_port)]
+        return actions
 
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
         connected_node_name, _ = self.switch_connections.get(datapath_id).get(port)
