@@ -184,7 +184,7 @@ class FRVM(app_manager.RyuApp):
                     buffer_id=msg.buffer_id)
                 return
         else: # we flood this packet
-            self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst) # modify
+            self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4) # modify
 
     def arp_route(self, msg):
         in_port, datapath, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
@@ -218,7 +218,8 @@ class FRVM(app_manager.RyuApp):
                     buffer_id=msg.buffer_id)
                 return
         else: # we flood this packet
-            self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip)
+            self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip,
+                src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP)
     
     def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
         for out_port in self.switch_connections.get(msg.datapath.id):
