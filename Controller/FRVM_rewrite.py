@@ -8,7 +8,7 @@ import re
 from ryu.base import app_manager  # Helps with ryu app developement such as registering
 from ryu.controller import ofp_event  # Import some triggerable
 from ryu.ofproto import ofproto_v1_3  # import the versions app is compatible with
-from ryu.controller.handler import MAIN_DISPATCHER, set_ev_cls  # After negotiating
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cls  # After negotiating
 # Ryu packages to process packets
 from ryu.lib.packet import packet, ipv4, arp, icmp, tcp, udp, ethernet, ether_types
 
@@ -134,10 +134,11 @@ class FRVM(app_manager.RyuApp):
         datapath = msg.datapath
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocol(ethernet.ethernet)
-        self.mac_to_switch_port.setdefault(datapath.id, {})
-        self.mac_to_switch_port[datapath.id][eth.src] = in_port
-        self.logger.info("packet in dpid={} src={} dst={} in_port={}".format(datapath.id, eth.src, eth.dst, in_port))
-        return in_port, datapath, pkt, eth.src, eth.dst
+        datapath_id = str(datapath.id).zfill(16)
+        self.mac_to_switch_port.setdefault(datapath_id, {})
+        self.mac_to_switch_port[datapath_id][eth.src] = in_port
+        self.logger.info("packet in dpid={} src={} dst={} in_port={}".format(datapath_id, eth.src, eth.dst, in_port))
+        return in_port, datapath, datapath_id, pkt, eth.src, eth.dst
     
     def get_src_dst_port(self, pkt):
         # Portless protocols
@@ -158,10 +159,10 @@ class FRVM(app_manager.RyuApp):
     
     
     def ip_route(self, msg):
-        in_port, datapath, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
+        in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
         ip_pkt = pkt.get_protocol(ipv4.ipv4)
-        if eth_dst in self.mac_to_switch_port[datapath.id][eth_src]: # if the dst mac is learned
-            out_port = self.mac_to_switch_port[datapath.id][eth_dst]
+        if eth_dst in self.mac_to_switch_port[datapath_id]: # if the dst mac is learned
+            out_port = self.mac_to_switch_port[datapath_id][eth_dst]
             match = datapath.ofproto_parser.OFPMatch(eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst)
             src_port, dst_port = self.get_src_dst_port(pkt)
             actions = self.get_actions(datapath, in_port, out_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
@@ -187,11 +188,11 @@ class FRVM(app_manager.RyuApp):
             self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4) # modify
 
     def arp_route(self, msg):
-        in_port, datapath, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
+        in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
         arp_pkt = pkt.get_protocol(arp.arp)
 
-        if eth_dst in self.mac_to_switch_port[datapath.id][eth_src]: # if the dst mac is learned
-            out_port = self.mac_to_switch_port[datapath.id][eth_dst]
+        if eth_dst in self.mac_to_switch_port[datapath_id]: # if the dst mac is learned
+            out_port = self.mac_to_switch_port[datapath_id][eth_dst]
             match = datapath.ofproto_parser.OFPMatch(eth_type=0x0806, arp_spa=arp_pkt.src_ip, arp_tpa=arp_pkt.dst_ip)
             actions = self.get_actions(
                 datapath, 
@@ -222,7 +223,9 @@ class FRVM(app_manager.RyuApp):
                 src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP)
     
     def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
-        for out_port in self.switch_connections.get(msg.datapath.id):
+        datapath_id = str(msg.datapath.id).zfill(16)
+        for out_port in self.switch_connections.get(datapath_id):
+            out_port = int(out_port)
             if out_port == in_port:
                 continue
             actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
@@ -234,12 +237,13 @@ class FRVM(app_manager.RyuApp):
         if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
             data = msg.data
         out = datapath.ofproto_parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                  in_port=in_port, actions=actions, data=data)
+                                  in_port=int(in_port), actions=actions, data=data)
         datapath.send_msg(out)
     
     def get_actions(self, datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol):
-        from_edge_port = self.is_edge_port(datapath.id, in_port, protocol)
-        to_edge_port = self.is_edge_port(datapath.id, out_port, protocol)
+        datapath_id = str(datapath.id).zfill(16)
+        from_edge_port = self.is_edge_port(datapath_id, in_port, protocol)
+        to_edge_port = self.is_edge_port(datapath_id, out_port, protocol)
 
         if from_edge_port and to_edge_port:
             actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
@@ -248,42 +252,39 @@ class FRVM(app_manager.RyuApp):
             actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
 
         elif from_edge_port and not to_edge_port:
-            new_src_ip, new_dst_ip = src_ip, dst_ip
+            actions = []
             # if source ip is host rip:
             if find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[0]): # item->((rip, port), (vip, port))
                 new_src_ip = self.rip_to_vip[(src_ip, src_port)][0] # change source rip to vip
+                proto_to_param_arg = { Proto_IPv4:{"ipv4_src":new_src_ip}, Proto_ARP:{"arp_spa":new_src_ip} }
+                actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             # if dst ip is host rip:
             if find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[0]): # item->((rip, port), (vip, port))
                 new_dst_ip = self.rip_to_vip[(dst_ip, dst_port)][0] # change source rip to vip
-            
-            if protocol == Proto_IPv4:
-                actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
-                            datapath.ofproto_parser.OFPActionOutput(out_port)]
-            elif protocol == Proto_ARP:
-                actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
-                            datapath.ofproto_parser.OFPActionOutput(out_port)]
+                proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
+                actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
+            actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
 
         elif not from_edge_port and to_edge_port:
-            new_src_ip, new_dst_ip = src_ip, dst_ip
+            actions = []
             # if source ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[1])
             if found_item:
                 new_src_ip = found_item[0][0] # change source vip to rip
+                proto_to_param_arg = { Proto_IPv4:{"ipv4_src":new_src_ip}, Proto_ARP:{"arp_spa":new_src_ip} }
+                actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             # if dst ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[1])
             if found_item:
                 new_dst_ip = found_item[0][0] # change source vip to rip
-
-            if protocol == Proto_IPv4:
-                actions = [datapath.ofproto_parser.OFPActionSetField(ipv4_src=new_src_ip, ipv4_dst=new_dst_ip),
-                        datapath.ofproto_parser.OFPActionOutput(out_port)]
-            elif protocol == Proto_ARP:
-                actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_src_ip, arp_tpa=new_dst_ip),
-                        datapath.ofproto_parser.OFPActionOutput(out_port)]
+                proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
+                actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
+            actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         return actions
-
+    
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
-        connected_node_name, _ = self.switch_connections.get(datapath_id).get(port)
+        print("datapath_id:{} type:{} \nport:{} type:{}".format(datapath_id, type(datapath_id), port, type(port)))
+        connected_node_name, _ = self.switch_connections.get(datapath_id).get(str(port))
         if re.match(r'^s\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
             return False
         elif re.match(r'^h\d+$', connected_node_name): # this port is connected to a host -> edge port
