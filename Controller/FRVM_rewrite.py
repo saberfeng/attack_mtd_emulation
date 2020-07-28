@@ -40,6 +40,10 @@ class FRVM(app_manager.RyuApp):
         self.num_hosts = int(self.config.get("num_hosts"))
         self.lease_period = int(self.config.get("mtd_time"))
 
+        self.switch_flood_group_ids = {}
+        self.flood_group_id = 1
+        self.init_flood_group_ids()
+
         self.dhcp_server = FRVM_DHCPServer(ADDRESS.address, ADDRESS.netmask, STATIC_IPS,
                                       ('10.0.1.{}'.format(self.num_hosts + 4), '10.0.1.254'))
         # item -> ((rip, port), (vip, port))
@@ -52,6 +56,36 @@ class FRVM(app_manager.RyuApp):
         self.timer = Timer(self.lease_period, self.create_timer)
         self.started = time.time()
         self.timer.start()
+
+    def get_new_group_id(self):
+        group_id = self.flood_group_id
+        self.flood_group_id += 1
+        return group_id
+    
+    def init_flood_group_ids(self):
+        """
+        self.switch_flood_group_ids ->
+        {
+            "0000000000000001":{
+                1:1,
+                2:2,
+                3:3,
+                4,4,
+                5,5
+            },
+            "0000000000000002":{
+                1:6,
+                2:7,
+                3:8
+            },
+            "0000000000000003": {
+                1: 9,
+                2: 10
+            }
+        }
+        """
+        for datapath_id in self.switch_connections:
+            self.switch_flood_group_ids[datapath_id] = {}
     
     def remaining_time(self):
         return self.lease_period - int(time.time() - self.started)
@@ -63,8 +97,8 @@ class FRVM(app_manager.RyuApp):
 
         self.allocate_vip(self.new_rip_to_vip)
         self.dhcp_server.release_all()
-        print("current:", self.rip_to_vip)
-        print("next round:", self.new_rip_to_vip)
+        # print("current:", self.rip_to_vip)
+        # print("next round:", self.new_rip_to_vip)
 
         self.timer = Timer(self.lease_period, self.create_timer)
         self.started = time.time()
@@ -74,7 +108,7 @@ class FRVM(app_manager.RyuApp):
         for i in range(self.num_hosts):
             ports = self.config.get(str(i))
             rip = "10.0.1.{}".format(3+i)
-            print("host {} opening ports {}".format(rip, " ".join(map(str, ports))))
+            # print("host {} opening ports {}".format(rip, " ".join(map(str, ports))))
             for port in ports + [Proto_ARP, "ICMP"]: # extra for portless protocols ARP, ICMP
                 rip_to_vip[(rip, port)] = self.dhcp_server.request("10.0.1.{}".format(i), port)
         self.dhcp_server.release_all()
@@ -128,6 +162,7 @@ class FRVM(app_manager.RyuApp):
             self.arp_route(msg) # change parameters
         elif ip_pkt:
             self.ip_route(msg)
+        print()
     
     def learn_mac_address(self, msg):
         in_port = msg.match['in_port']
@@ -170,7 +205,7 @@ class FRVM(app_manager.RyuApp):
             if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
                 self.add_flow(
                     datapath=datapath, 
-                    priority=1, 
+                    priority=2, 
                     match=match,
                     actions=actions,
                     hard_timeout=self.remaining_time())
@@ -178,14 +213,17 @@ class FRVM(app_manager.RyuApp):
             else:
                 self.add_flow(
                     datapath=datapath, 
-                    priority=1, 
+                    priority=2, 
                     match=match,
                     actions=actions,
                     hard_timeout=self.remaining_time(),
                     buffer_id=msg.buffer_id)
                 return
         else: # we flood this packet
-            self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4) # modify
+            # self.add_flood_group(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
+            # actions = [datapath.ofproto_parser.OFPActionGroup(FLOOD_GROUP_ID)] # use the flood group 
+            # self.packet_out(msg, actions, in_port)
+            self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
 
     def arp_route(self, msg):
         in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
@@ -204,7 +242,7 @@ class FRVM(app_manager.RyuApp):
             if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
                 self.add_flow(
                     datapath=datapath, 
-                    priority=1, 
+                    priority=2, 
                     match=match,
                     actions=actions,
                     hard_timeout=self.remaining_time())
@@ -212,24 +250,85 @@ class FRVM(app_manager.RyuApp):
             else:
                 self.add_flow(
                     datapath=datapath, 
-                    priority=1, 
+                    priority=2, 
                     match=match,
                     actions=actions,
                     hard_timeout=self.remaining_time(),
                     buffer_id=msg.buffer_id)
                 return
         else: # we flood this packet
-            self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip,
+            self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip, 
                 src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP)
     
     def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
+        group_id = self.switch_flood_group_ids.get(str(msg.datapath.id).zfill(16)).get(in_port)
+        # if we already have installed a flood group for this port
+        # use this group to process this packet
+        if not group_id: 
+            # add flood group
+            group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol)
+            print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
+            self.switch_flood_group_ids[str(msg.datapath.id).zfill(16)][in_port] = group_id # update mapping
+        else:
+            # update flood group to use latest vips
+            self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id)
+        actions = [msg.datapath.ofproto_parser.OFPActionGroup(group_id)] 
+        self.packet_out(msg, actions, in_port)
+    
+    # def add_flood_group(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
+    #     buckets = []
+    #     datapath_id = str(msg.datapath.id).zfill(16)
+    #     for out_port in self.switch_connections.get(datapath_id):
+    #         out_port = int(out_port)
+    #         if out_port == in_port:
+    #             continue
+    #         actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
+    #         buckets.append(msg.datapath.ofproto_parser.OFPBucket(weight=0, actions=actions))
+    #     group_id = self.get_new_group_id()
+    #     req = msg.datapath.ofproto_parser.OFPGroupMod(
+    #         msg.datapath, 
+    #         msg.datapath.ofproto.OFPGC_ADD, 
+    #         msg.datapath.ofproto.OFPGT_ALL,
+    #         group_id,
+    #         buckets)
+    #     msg.datapath.send_msg(req)
+    #     return group_id
+    
+    def add_or_mod_flood_group(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id=None):
+        buckets = []
         datapath_id = str(msg.datapath.id).zfill(16)
         for out_port in self.switch_connections.get(datapath_id):
             out_port = int(out_port)
             if out_port == in_port:
                 continue
             actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
-            self.packet_out(msg, actions, in_port)
+            buckets.append(msg.datapath.ofproto_parser.OFPBucket(weight=0, actions=actions))
+        if group_id is None:
+            group_id = self.get_new_group_id()
+            req = msg.datapath.ofproto_parser.OFPGroupMod(
+                msg.datapath, 
+                msg.datapath.ofproto.OFPGC_ADD, 
+                msg.datapath.ofproto.OFPGT_ALL,
+                group_id,
+                buckets)
+            msg.datapath.send_msg(req)
+        else:
+            req = msg.datapath.ofproto_parser.OFPGroupMod(
+                msg.datapath, 
+                msg.datapath.ofproto.OFPGC_MODIFY, 
+                msg.datapath.ofproto.OFPGT_ALL,
+                group_id,
+                buckets)
+            msg.datapath.send_msg(req)
+        return group_id
+    # def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
+    #     datapath_id = str(msg.datapath.id).zfill(16)
+    #     for out_port in self.switch_connections.get(datapath_id):
+    #         out_port = int(out_port)
+    #         if out_port == in_port:
+    #             continue
+    #         actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
+    #         self.packet_out(msg, actions, in_port)
 
     def packet_out(self, msg, actions, in_port):
         datapath = msg.datapath
@@ -283,7 +382,6 @@ class FRVM(app_manager.RyuApp):
         return actions
     
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
-        print("datapath_id:{} type:{} \nport:{} type:{}".format(datapath_id, type(datapath_id), port, type(port)))
         connected_node_name, _ = self.switch_connections.get(datapath_id).get(str(port))
         if re.match(r'^s\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
             return False
@@ -298,38 +396,6 @@ class FRVM(app_manager.RyuApp):
                 raise Exception("do not support other protocol")
         else:
             raise Exception("can't accept the node name:{}".format(connected_node_name))
-
-    # def get_actions_ARP(self, datapath, in_port, out_port, source_ip, target_ip):
-    #     if self.is_edge_port(datapath.id, in_port, Proto_ARP): # packet is from edge port
-    #         if self.is_edge_port(datapath.id, out_port, Proto_ARP): # packet is going to edge port
-    #             actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-    #         else: # packet is going to non-edge port
-    #             new_source_ip, new_target_ip = source_ip, target_ip
-    #             # if source ip is host rip:
-    #             if find_in_dict(self.rip_to_vip, source_ip, lambda item: item[0][0]): # item->((rip, port), (vip, port))
-    #                 new_source_ip = self.rip_to_vip[(source_ip, Proto_ARP)][0] # change source rip to vip
-    #             # if target ip is host rip:
-    #             if find_in_dict(self.rip_to_vip, target_ip, lambda item: item[0][0]): # item->((rip, port), (vip, port))
-    #                 new_target_ip = self.rip_to_vip[(target_ip, Proto_ARP)][0] # change source rip to vip
-    #             actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_source_ip, arp_tpa=new_target_ip),
-    #                        datapath.ofproto_parser.OFPActionOutput(out_port)]
-        
-    #     else: # packet is from non-edge port
-    #         if self.is_edge_port(datapath.id, out_port, Proto_ARP): # packet is going to edge port
-    #             new_source_ip, new_target_ip = source_ip, target_ip
-    #             # if source ip is host vip:
-    #             found_item = find_in_dict(self.rip_to_vip, source_ip, lambda item: item[1][0])
-    #             if found_item:
-    #                 new_source_ip = found_item[0][0] # change source vip to rip
-    #             # if target ip is host vip:
-    #             found_item = find_in_dict(self.rip_to_vip, target_ip, lambda item: item[1][0])
-    #             if found_item:
-    #                 new_target_ip = found_item[0][0] # change source vip to rip
-    #             actions = [datapath.ofproto_parser.OFPActionSetField(arp_spa=new_source_ip, arp_tpa=new_target_ip),
-    #                        datapath.ofproto_parser.OFPActionOutput(out_port)]
-    #         else: # packet is going to non-edge port
-    #             actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
-    #     return actions
 
 def load_json_file(file_path) -> dict:
     with open(file_path, "r") as f:
