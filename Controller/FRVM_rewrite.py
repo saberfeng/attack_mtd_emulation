@@ -36,6 +36,7 @@ class FRVM(app_manager.RyuApp):
         super(FRVM, self).__init__(*args, **kwargs)
         self.mac_to_switch_port = {}
         self.switch_connections = load_json_file("switch_connections.json")
+        self.get_switch_port_to_gateway()
         self.config = load_json_file("./Ryu/hosts_ports.json")
         self.num_hosts = int(self.config.get("num_hosts"))
         self.lease_period = int(self.config.get("mtd_time"))
@@ -49,6 +50,7 @@ class FRVM(app_manager.RyuApp):
         # item -> ((rip, port), (vip, port))
         self.rip_to_vip = {}  # (rip, port) => (vip, port)
         self.allocate_vip(self.rip_to_vip)
+        print("current:", self.rip_to_vip)
 
         self.new_rip_to_vip = {} # next round
         self.allocate_vip(self.new_rip_to_vip)
@@ -56,6 +58,16 @@ class FRVM(app_manager.RyuApp):
         self.timer = Timer(self.lease_period, self.create_timer)
         self.started = time.time()
         self.timer.start()
+        self.arp_requests = {}
+
+    def get_switch_port_to_gateway(self):
+        for datapath_id in self.switch_connections:
+            for port in self.switch_connections[datapath_id]:
+                node_name, _ = self.switch_connections[datapath_id][port]
+                # if the node connected to this port is "r1", save this datapath and port
+                if re.match(r'^r\d+$', node_name): 
+                    self.switch_port_to_gateway = (datapath_id, int(port))
+                    return
 
     def get_new_group_id(self):
         group_id = self.flood_group_id
@@ -97,7 +109,6 @@ class FRVM(app_manager.RyuApp):
 
         self.allocate_vip(self.new_rip_to_vip)
         self.dhcp_server.release_all()
-        # print("current:", self.rip_to_vip)
         # print("next round:", self.new_rip_to_vip)
 
         self.timer = Timer(self.lease_period, self.create_timer)
@@ -224,15 +235,35 @@ class FRVM(app_manager.RyuApp):
             # actions = [datapath.ofproto_parser.OFPActionGroup(FLOOD_GROUP_ID)] # use the flood group 
             # self.packet_out(msg, actions, in_port)
             self.flood_packet(msg, in_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
+    
+    def find_arp_vip(self, vip):
+        # input vip: the vip of a host, may not be the correct vip for arp
+        found_item = find_in_dict(self.rip_to_vip, vip, lambda item: item[1][0])
+        if found_item:
+            rip, _ = found_item[0]
+            arp_vip, _ = self.rip_to_vip.get((rip, Proto_ARP))
+            return arp_vip
+
+    def modify_packets_from_gateway(self, datapath, datapath_id, in_port, arp_pkt):
+        if datapath_id == self.switch_port_to_gateway[0] and \
+           in_port == self.switch_port_to_gateway[1]:
+            arp_vip = self.find_arp_vip(arp_pkt.dst_ip)
+            if arp_vip not in self.arp_requests:
+                self.arp_requests[arp_vip] = []
+            self.arp_requests[arp_vip].append(arp_pkt.dst_ip)
+            arp_pkt.dst_ip = arp_vip # ??????????
+            return [datapath.ofproto_parser.OFPActionSetField(arp_tpa=arp_vip)]
+        return []
 
     def arp_route(self, msg):
         in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
         arp_pkt = pkt.get_protocol(arp.arp)
+        actions = self.modify_packets_from_gateway(datapath, datapath_id, in_port, arp_pkt)
 
         if eth_dst in self.mac_to_switch_port[datapath_id]: # if the dst mac is learned
             out_port = self.mac_to_switch_port[datapath_id][eth_dst]
             match = datapath.ofproto_parser.OFPMatch(eth_type=0x0806, arp_spa=arp_pkt.src_ip, arp_tpa=arp_pkt.dst_ip)
-            actions = self.get_actions(
+            actions += self.get_actions(
                 datapath, 
                 in_port, out_port, 
                 arp_pkt.src_ip, arp_pkt.dst_ip, 
@@ -257,52 +288,34 @@ class FRVM(app_manager.RyuApp):
                     buffer_id=msg.buffer_id)
                 return
         else: # we flood this packet
+            # 增加一个actions = []参数 !!!!!!!!!!!!!!!!!!!
             self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip, 
-                src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP)
+                src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP, actions=actions)
     
-    def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
+    def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, actions=[]):
         group_id = self.switch_flood_group_ids.get(str(msg.datapath.id).zfill(16)).get(in_port)
         # if we already have installed a flood group for this port
         # use this group to process this packet
         if not group_id: 
             # add flood group
-            group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol)
-            print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
+            group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, actions=actions)
+            # print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
             self.switch_flood_group_ids[str(msg.datapath.id).zfill(16)][in_port] = group_id # update mapping
         else:
             # update flood group to use latest vips
-            self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id)
-        actions = [msg.datapath.ofproto_parser.OFPActionGroup(group_id)] 
-        self.packet_out(msg, actions, in_port)
-    
-    # def add_flood_group(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
-    #     buckets = []
-    #     datapath_id = str(msg.datapath.id).zfill(16)
-    #     for out_port in self.switch_connections.get(datapath_id):
-    #         out_port = int(out_port)
-    #         if out_port == in_port:
-    #             continue
-    #         actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
-    #         buckets.append(msg.datapath.ofproto_parser.OFPBucket(weight=0, actions=actions))
-    #     group_id = self.get_new_group_id()
-    #     req = msg.datapath.ofproto_parser.OFPGroupMod(
-    #         msg.datapath, 
-    #         msg.datapath.ofproto.OFPGC_ADD, 
-    #         msg.datapath.ofproto.OFPGT_ALL,
-    #         group_id,
-    #         buckets)
-    #     msg.datapath.send_msg(req)
-    #     return group_id
-    
-    def add_or_mod_flood_group(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id=None):
+            self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id, actions=actions)
+        group_action = [msg.datapath.ofproto_parser.OFPActionGroup(group_id)] 
+        self.packet_out(msg, group_action, in_port)
+
+    def add_or_mod_flood_group(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id=None, actions=[]):
         buckets = []
         datapath_id = str(msg.datapath.id).zfill(16)
         for out_port in self.switch_connections.get(datapath_id):
             out_port = int(out_port)
             if out_port == in_port:
                 continue
-            actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
-            buckets.append(msg.datapath.ofproto_parser.OFPBucket(weight=0, actions=actions))
+            more_actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
+            buckets.append(msg.datapath.ofproto_parser.OFPBucket(weight=0, actions=actions+more_actions))
         if group_id is None:
             group_id = self.get_new_group_id()
             req = msg.datapath.ofproto_parser.OFPGroupMod(
@@ -321,14 +334,6 @@ class FRVM(app_manager.RyuApp):
                 buckets)
             msg.datapath.send_msg(req)
         return group_id
-    # def flood_packet(self, msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol):
-    #     datapath_id = str(msg.datapath.id).zfill(16)
-    #     for out_port in self.switch_connections.get(datapath_id):
-    #         out_port = int(out_port)
-    #         if out_port == in_port:
-    #             continue
-    #         actions = self.get_actions(msg.datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol)
-    #         self.packet_out(msg, actions, in_port)
 
     def packet_out(self, msg, actions, in_port):
         datapath = msg.datapath
@@ -343,13 +348,22 @@ class FRVM(app_manager.RyuApp):
         datapath_id = str(datapath.id).zfill(16)
         from_edge_port = self.is_edge_port(datapath_id, in_port, protocol)
         to_edge_port = self.is_edge_port(datapath_id, out_port, protocol)
-
+        
         if from_edge_port and to_edge_port:
             actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
             
         elif not from_edge_port and not to_edge_port:
-            actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+            actions = []
+            # arp response to gateway
+            if protocol == Proto_ARP and\
+                datapath_id == self.switch_port_to_gateway[0] and\
+                out_port == self.switch_port_to_gateway[1] and\
+                src_ip in self.arp_requests and\
+                len(self.arp_requests[src_ip]) > 0:
 
+                arp_dst_before_modify = self.arp_requests[src_ip].pop(0)
+                actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
+            actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif from_edge_port and not to_edge_port:
             actions = []
             # if source ip is host rip:
@@ -362,9 +376,26 @@ class FRVM(app_manager.RyuApp):
                 new_dst_ip = self.rip_to_vip[(dst_ip, dst_port)][0] # change source rip to vip
                 proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
-            actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
+            
 
+            # arp response to gateway
+            if protocol == Proto_ARP and\
+                datapath_id == self.switch_port_to_gateway[0] and\
+                out_port == self.switch_port_to_gateway[1]:
+
+                arp_vip, _ = self.rip_to_vip.get((src_ip, Proto_ARP))
+                if arp_vip in self.arp_requests and len(self.arp_requests[arp_vip])>0:
+                    arp_dst_before_modify = self.arp_requests[arp_vip].pop(0)
+                    actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
+
+            actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif not from_edge_port and to_edge_port:
+            # if datapath.id == 1 and in_port == 1 and out_port == 4:
+            #     print("*"*20 + "\n" + \
+            #     " datapath_id:{}\n in_port:{}\n out_port:{}\n src_ip:{}\n dst_ip:{}\n src_port:{}\n dst_port:{}\n proto:{}".format(
+            #         datapath.id, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol))
+            #     print("from_edge_port:{}\n to_edge_port:{}\n".format(from_edge_port, to_edge_port))
+
             actions = []
             # if source ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[1])
@@ -374,26 +405,42 @@ class FRVM(app_manager.RyuApp):
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             # if dst ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[1])
+            
+            # # debug
+            # if datapath.id == 1 and in_port == 1 and out_port == 4:
+            #     print("dst is vip? found_item:{}".format(found_item))
+            #     print(self.rip_to_vip)
             if found_item:
                 new_dst_ip = found_item[0][0] # change source vip to rip
                 proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
+        
+        # if datapath.id == 1 and in_port == 1 and out_port == 4: # debug
+        #     print(actions)
+        #     print("*"*20)
         return actions
+    
+    # def modify_packets_to_gateway(self, datapath_id, out_port, src_ip, dst_ip, protocol):
+    #     if protocol != Proto_ARP:
+    #         return []
+    #     if datapath_id == self.switch_port_to_gateway[0] and \
+    #        out_port == self.switch_port_to_gateway[1]:
+
     
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
         connected_node_name, _ = self.switch_connections.get(datapath_id).get(str(port))
-        if re.match(r'^s\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
+        if re.match(r'^s\d+$|^r\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
             return False
         elif re.match(r'^h\d+$', connected_node_name): # this port is connected to a host -> edge port
             return True
-        elif re.match(r'^r\d+$', connected_node_name):
-            if protocol == Proto_ARP: # for ARP, the port connecting router is edge port
-                return True
-            elif protocol == Proto_IPv4: # for IP, the port connecting router is non-edge port
-                return False
-            else:
-                raise Exception("do not support other protocol")
+        # elif re.match(r'^r\d+$', connected_node_name):
+            # if protocol == Proto_ARP: # for ARP, the port connecting router is edge port
+            #     return True
+            # elif protocol == Proto_IPv4: # for IP, the port connecting router is non-edge port
+            #     return False
+            # else:
+            #     raise Exception("do not support other protocol")
         else:
             raise Exception("can't accept the node name:{}".format(connected_node_name))
 
