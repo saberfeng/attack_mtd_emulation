@@ -50,7 +50,7 @@ class FRVM(app_manager.RyuApp):
         # item -> ((rip, port), (vip, port))
         self.rip_to_vip = {}  # (rip, port) => (vip, port)
         self.allocate_vip(self.rip_to_vip)
-        print("current:", self.rip_to_vip)
+        self.pretty_print_rip_to_vip()
 
         self.new_rip_to_vip = {} # next round
         self.allocate_vip(self.new_rip_to_vip)
@@ -59,6 +59,10 @@ class FRVM(app_manager.RyuApp):
         self.started = time.time()
         self.timer.start()
         self.arp_requests = {}
+    
+    def pretty_print_rip_to_vip(self):
+        for item in self.rip_to_vip.items():
+            print(item)
 
     def get_switch_port_to_gateway(self):
         for datapath_id in self.switch_connections:
@@ -251,7 +255,7 @@ class FRVM(app_manager.RyuApp):
             if arp_vip not in self.arp_requests:
                 self.arp_requests[arp_vip] = []
             self.arp_requests[arp_vip].append(arp_pkt.dst_ip)
-            arp_pkt.dst_ip = arp_vip # ??????????
+            arp_pkt.dst_ip = arp_vip 
             return [datapath.ofproto_parser.OFPActionSetField(arp_tpa=arp_vip)]
         return []
 
@@ -269,26 +273,32 @@ class FRVM(app_manager.RyuApp):
                 arp_pkt.src_ip, arp_pkt.dst_ip, 
                 src_port=Proto_ARP, dst_port=Proto_ARP,
                 protocol=Proto_ARP)
+            # we don't install flows for arp responses
+            # because when there are multiple arp requests for different vips of the same host from the gateway router,
+            # we can't decide which of these vips should we set as the arp_spa in the flow actions.
+            # we have to let this controller set arp_spa dynamically
+            self.packet_out(msg, actions, in_port)
 
-            if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
-                self.add_flow(
-                    datapath=datapath, 
-                    priority=2, 
-                    match=match,
-                    actions=actions,
-                    hard_timeout=self.remaining_time())
-                self.packet_out(msg, actions, in_port)
-            else:
-                self.add_flow(
-                    datapath=datapath, 
-                    priority=2, 
-                    match=match,
-                    actions=actions,
-                    hard_timeout=self.remaining_time(),
-                    buffer_id=msg.buffer_id)
-                return
-        else: # we flood this packet
-            # 增加一个actions = []参数 !!!!!!!!!!!!!!!!!!!
+            # if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
+            #     self.add_flow(
+            #         datapath=datapath, 
+            #         priority=2, 
+            #         match=match,
+            #         actions=actions,
+            #         hard_timeout=self.remaining_time())
+            #     self.packet_out(msg, actions, in_port)
+            # else:
+            #     self.add_flow(
+            #         datapath=datapath, 
+            #         priority=2, 
+            #         match=match,
+            #         actions=actions,
+            #         hard_timeout=self.remaining_time(),
+            #         buffer_id=msg.buffer_id)
+            #     return
+        else: 
+            # we flood this packet
+            # all arp request will be flooded, since we can't learn the MAC address: 00:00:00:00.....
             self.flood_packet(msg, in_port, arp_pkt.src_ip, arp_pkt.dst_ip, 
                 src_port=Proto_ARP, dst_port=Proto_ARP, protocol=Proto_ARP, actions=actions)
     
@@ -390,12 +400,6 @@ class FRVM(app_manager.RyuApp):
 
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif not from_edge_port and to_edge_port:
-            # if datapath.id == 1 and in_port == 1 and out_port == 4:
-            #     print("*"*20 + "\n" + \
-            #     " datapath_id:{}\n in_port:{}\n out_port:{}\n src_ip:{}\n dst_ip:{}\n src_port:{}\n dst_port:{}\n proto:{}".format(
-            #         datapath.id, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol))
-            #     print("from_edge_port:{}\n to_edge_port:{}\n".format(from_edge_port, to_edge_port))
-
             actions = []
             # if source ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (src_ip, src_port), lambda item: item[1])
@@ -405,42 +409,21 @@ class FRVM(app_manager.RyuApp):
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             # if dst ip is host vip:
             found_item = find_in_dict(self.rip_to_vip, (dst_ip, dst_port), lambda item: item[1])
-            
-            # # debug
-            # if datapath.id == 1 and in_port == 1 and out_port == 4:
-            #     print("dst is vip? found_item:{}".format(found_item))
-            #     print(self.rip_to_vip)
+
             if found_item:
                 new_dst_ip = found_item[0][0] # change source vip to rip
                 proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
-        
-        # if datapath.id == 1 and in_port == 1 and out_port == 4: # debug
-        #     print(actions)
-        #     print("*"*20)
-        return actions
-    
-    # def modify_packets_to_gateway(self, datapath_id, out_port, src_ip, dst_ip, protocol):
-    #     if protocol != Proto_ARP:
-    #         return []
-    #     if datapath_id == self.switch_port_to_gateway[0] and \
-    #        out_port == self.switch_port_to_gateway[1]:
 
-    
+        return actions
+
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
         connected_node_name, _ = self.switch_connections.get(datapath_id).get(str(port))
         if re.match(r'^s\d+$|^r\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
             return False
         elif re.match(r'^h\d+$', connected_node_name): # this port is connected to a host -> edge port
             return True
-        # elif re.match(r'^r\d+$', connected_node_name):
-            # if protocol == Proto_ARP: # for ARP, the port connecting router is edge port
-            #     return True
-            # elif protocol == Proto_IPv4: # for IP, the port connecting router is non-edge port
-            #     return False
-            # else:
-            #     raise Exception("do not support other protocol")
         else:
             raise Exception("can't accept the node name:{}".format(connected_node_name))
 
