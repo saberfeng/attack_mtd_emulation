@@ -7,7 +7,7 @@ __email__ = "cole.dishington@pg.canterbury.ac.nz"
 __status__ = "Developement"
 
 from random import SystemRandom  # cryptographically secure random number generator as implemented by OS
-import Controller.controller_helper as ch
+import controller_helper as ch
 
 
 class DHCPServer(object):

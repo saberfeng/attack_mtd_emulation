@@ -12,8 +12,8 @@ from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, set_ev_cl
 # Ryu packages to process packets
 from ryu.lib.packet import packet, ipv4, arp, icmp, tcp, udp, ethernet, ether_types
 
-from Controller.DHCP_server import FRVM_DHCPServer
-import Controller.controller_helper as helper
+from DHCP_server import FRVM_DHCPServer
+import controller_helper as helper
 
 # IP class
 IP = namedtuple('IP', ['address', 'netmask', 'subnet'])
@@ -24,6 +24,9 @@ ETH_BROADCAST = "ff:ff:ff:ff:ff:ff"
 
 Proto_IPv4 = "IPv4"
 Proto_ARP = "ARP"
+Proto_TCP = "TCP"
+Proto_UDP = "UDP"
+Proto_ICMP = "ICMP"
 
 class FRVM(app_manager.RyuApp):
     """
@@ -199,22 +202,47 @@ class FRVM(app_manager.RyuApp):
         tcp_pkt = pkt.get_protocol(tcp.tcp)
 
         if arp_pkt:
-            return Proto_ARP, Proto_ARP
+            return Proto_ARP, Proto_ARP, Proto_ARP
         elif icmp_pkt:
-            return "ICMP", "ICMP"
+            return "ICMP", "ICMP", Proto_ICMP
         elif udp_pkt:
-            return udp_pkt.src_port, udp_pkt.dst_port
+            return udp_pkt.src_port, udp_pkt.dst_port, Proto_UDP
         elif tcp_pkt:
-            return tcp_pkt.src_port, tcp_pkt.dst_port
+            return tcp_pkt.src_port, tcp_pkt.dst_port, Proto_TCP
     
+    def get_ip_match_by_proto(self, datapath, eth_type, ipv4_src, ipv4_dst, src_port, dst_port, proto):
+        if proto == Proto_TCP:
+            return datapath.ofproto_parser.OFPMatch(
+                eth_type=0x0800,
+                ip_proto=6,
+                ipv4_src=ipv4_src, 
+                ipv4_dst=ipv4_dst,
+                tcp_src=src_port,
+                tcp_dst=dst_port)
+        elif proto == Proto_UDP:
+            print("*"*20)
+            print(ipv4_src, ipv4_dst, src_port, dst_port)
+            return datapath.ofproto_parser.OFPMatch(
+                eth_type=0x0800,
+                ip_proto=17,
+                ipv4_src=ipv4_src, 
+                ipv4_dst=ipv4_dst,
+                udp_src=src_port,
+                udp_dst=dst_port)
+            
     
     def ip_route(self, msg):
         in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
         ip_pkt = pkt.get_protocol(ipv4.ipv4)
+        src_port, dst_port, proto = self.get_src_dst_port(pkt)
         if eth_dst in self.mac_to_switch_port[datapath_id]: # if the dst mac is learned
             out_port = self.mac_to_switch_port[datapath_id][eth_dst]
+
+            # src_port, dst_port, tcp_or_udp = self.get_src_dst_port(pkt)
+            # match = self.get_ip_match_by_proto(
+            #     datapath, eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst, src_port=src_port, dst_port=dst_port, proto=tcp_or_udp)
             match = datapath.ofproto_parser.OFPMatch(eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst)
-            src_port, dst_port = self.get_src_dst_port(pkt)
+            
             actions = self.get_actions(datapath, in_port, out_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
 
             if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
@@ -311,6 +339,7 @@ class FRVM(app_manager.RyuApp):
             group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, actions=actions)
             # print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
             self.switch_flood_group_ids[str(msg.datapath.id).zfill(16)][in_port] = group_id # update mapping
+            self.debug_print_group_ids()
         else:
             # update flood group to use latest vips
             self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id, actions=actions)
@@ -426,6 +455,14 @@ class FRVM(app_manager.RyuApp):
             return True
         else:
             raise Exception("can't accept the node name:{}".format(connected_node_name))
+    
+    def debug_print_group_ids(self):
+        print("*********************")
+        print("latest group id:", self.flood_group_id)
+        print("group ids:")
+        print(json.dumps(self.switch_flood_group_ids))
+        print("*********************")
+
 
 def load_json_file(file_path) -> dict:
     with open(file_path, "r") as f:

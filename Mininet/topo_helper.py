@@ -15,14 +15,40 @@ def open_host_ports(net, config, protocol="tcp"):
     :return: None
     """
     nodes = net.hosts
-    for idx in range(len(nodes)):
-        node = nodes[idx]
+    vul_host_index = 0
+    for node in nodes:
         if re.match(r'h\d+', node.name):
-            ports = config.get(str(idx), None)
-            print("Host {} opening ports {}", idx, " ".join(map(str, ports)))
+            ports = config.get(str(vul_host_index), None)
+            vul_host_index += 1
+            try:
+                print("Host {} opening ports {}", vul_host_index, " ".join(map(str, ports)))
+            except Exception:
+                print("ports:", ports)
+                print("idx:", vul_host_index)
+                print("hosts:", len(net.hosts))
+                for index in range(len(nodes)):
+                    node = nodes[index]
+                    print(node.name)
             # ./Mininet/open_ports.py tcp 1111 2222 3333 &
             command = "./Mininet/open_ports.py {} {} &".format(protocol, " ".join(map(str, ports)))
             node.cmd(command)
+
+    # for idx in range(len(nodes)):
+    #     node = nodes[idx]
+    #     if re.match(r'h\d+', node.name):
+    #         ports = config.get(str(idx), None)
+    #         try:
+    #             print("Host {} opening ports {}", idx, " ".join(map(str, ports)))
+    #         except Exception:
+    #             print("ports:", ports)
+    #             print("idx:", idx)
+    #             print("hosts:", len(net.hosts))
+    #             for index in range(len(nodes)):
+    #                 node = nodes[index]
+    #                 print(node.name)
+    #         # ./Mininet/open_ports.py tcp 1111 2222 3333 &
+    #         command = "./Mininet/open_ports.py {} {} &".format(protocol, " ".join(map(str, ports)))
+    #         node.cmd(command)
 
 
 def open_rnd_host_ports(net, protocol="tcp"):
