@@ -156,11 +156,11 @@ def create_network(config, is_containernet):
     num_hosts = int(config.get("num_hosts"))
     controller_type = config.get("controller_type")
 
-    r1 = net.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")  # Router
+    o1 = net.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")  # Outsider
     if is_containernet:
-        o1 = net.addDocker('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01", dimage="rightscale/openvas")  # Outsider
+        r1 = net.addDocker('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01", dimage="rightscale/openvas")  # Router
     else:    
-        o1 = net.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")
+        r1 = net.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")
     
 
     # Static number of switches
@@ -201,16 +201,16 @@ def start_network(net, config, is_containernet):
         # start Metasploitable services
         h6.cmd("/bin/services.sh")
         # start openvas services
-        o1.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
-        o1.cmd("openvas-mkcert-client -i -n")
-        o1.cmd('openvasmd '+\
+        r1.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
+        r1.cmd("openvas-mkcert-client -i -n")
+        r1.cmd('openvasmd '+\
             '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
             '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
             '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
             '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
-        o1.cmd('service redis-server restart')
-        o1.cmd('/openvas/startup.sh & ')
-        o1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
+        r1.cmd('service redis-server restart')
+        r1.cmd('/openvas/startup.sh & ')
+        # r1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
     else:
         # Opening udp ports
         topo_helper.open_host_ports(net, config, "udp")

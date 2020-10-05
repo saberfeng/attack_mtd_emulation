@@ -84,7 +84,7 @@
     "scan_type":"sS",
     "MTD_interval_scan":0,
     "single_port":false,
-    "mtd_time":3600,
+    "mtd_time":36000,
     "num_ports":10,
     "ports_discovered":true,
     "num_hosts":5

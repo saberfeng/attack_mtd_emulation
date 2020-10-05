@@ -64,8 +64,11 @@ class FRVM(app_manager.RyuApp):
         self.arp_requests = {}
     
     def pretty_print_rip_to_vip(self):
-        for item in self.rip_to_vip.items():
-            print(item)
+        with open("rip_vip", "w") as f:
+            for item in self.rip_to_vip.items():
+                print(item)
+                f.write(str(item))
+                f.write("\n")
 
     def get_switch_port_to_gateway(self):
         for datapath_id in self.switch_connections:
@@ -204,7 +207,7 @@ class FRVM(app_manager.RyuApp):
         if arp_pkt:
             return Proto_ARP, Proto_ARP, Proto_ARP
         elif icmp_pkt:
-            return "ICMP", "ICMP", Proto_ICMP
+            return Proto_ICMP, Proto_ICMP, Proto_ICMP
         elif udp_pkt:
             return udp_pkt.src_port, udp_pkt.dst_port, Proto_UDP
         elif tcp_pkt:
@@ -229,6 +232,13 @@ class FRVM(app_manager.RyuApp):
                 ipv4_dst=ipv4_dst,
                 udp_src=src_port,
                 udp_dst=dst_port)
+        elif proto == Proto_ICMP:
+            return datapath.ofproto_parser.OFPMatch(
+                eth_type=0x0800,
+                ip_proto=1,
+                ipv4_src=ipv4_src, 
+                ipv4_dst=ipv4_dst
+            )
             
     
     def ip_route(self, msg):
@@ -239,9 +249,9 @@ class FRVM(app_manager.RyuApp):
             out_port = self.mac_to_switch_port[datapath_id][eth_dst]
 
             # src_port, dst_port, tcp_or_udp = self.get_src_dst_port(pkt)
-            # match = self.get_ip_match_by_proto(
-            #     datapath, eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst, src_port=src_port, dst_port=dst_port, proto=tcp_or_udp)
-            match = datapath.ofproto_parser.OFPMatch(eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst)
+            match = self.get_ip_match_by_proto(
+                datapath, eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst, src_port=src_port, dst_port=dst_port, proto=proto)
+            # match = datapath.ofproto_parser.OFPMatch(eth_type=0x0800, ipv4_src=ip_pkt.src, ipv4_dst=ip_pkt.dst)
             
             actions = self.get_actions(datapath, in_port, out_port, ip_pkt.src, ip_pkt.dst, src_port, dst_port, Proto_IPv4)
 
@@ -339,7 +349,7 @@ class FRVM(app_manager.RyuApp):
             group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, actions=actions)
             # print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
             self.switch_flood_group_ids[str(msg.datapath.id).zfill(16)][in_port] = group_id # update mapping
-            self.debug_print_group_ids()
+            # self.debug_print_group_ids()
         else:
             # update flood group to use latest vips
             self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id, actions=actions)

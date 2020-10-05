@@ -24,7 +24,7 @@ def create_network():
     r1 = net.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")  # Router  
     s1 = net.addSwitch('s1', dpid='0000000000000001') 
     h3 = net.addDocker("h3", ip="10.0.1.3", dimage="tleemcjr/metasploitable2")
-    h4 = net.addHost("h4", ip="10.0.1.4")
+    h4 = net.addDocker("h4", ip="10.0.1.4", dimage="rightscale/openvas")
 
     linkparams = {'delay': '0.5ms'} 
     net.addLink(s1, r1, port1=1, **linkparams)
@@ -49,8 +49,19 @@ def start_network(net):
     # o1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
 
     h3 = net.get('h3')
+    h4 = net.get('h4')
     # start Metasploitable services
     h3.cmd("/bin/services.sh")
+
+    h4.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
+    h4.cmd("openvas-mkcert-client -i -n")
+    h4.cmd('openvasmd '+\
+        '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
+        '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
+        '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
+        '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
+    h4.cmd('service redis-server restart')
+    h4.cmd('/openvas/startup.sh & ')
 
     net.start()
     CLI(net)
