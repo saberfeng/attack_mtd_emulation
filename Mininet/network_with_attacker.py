@@ -51,6 +51,7 @@ class NmapNetwork(Topo):
         self.controller_type = self.config.get("controller_type")
 
         r1 = self.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")  # Router
+        a2 = self.addHost('a2', ip="10.0.1.2/24", mac="00:00:00:00:00:02")  # Attacker
         o1 = self.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")  # Outsider
 
         # Static number of switches
@@ -58,9 +59,8 @@ class NmapNetwork(Topo):
         s1 = self.addSwitch('s1', dpid='0000000000000001')
         s2 = self.addSwitch('s2', dpid='0000000000000002')
         s3 = self.addSwitch('s3', dpid='0000000000000003')
-        # s4 = self.addSwitch('s4', dpid='0000000000000004')
-        # s5 = self.addSwitch('s5', dpid='0000000000000005')
         self.addLink(s1, r1, port1=1, **linkparams)
+        self.addLink(s1, a2, port1=4, **linkparams) # debug
         self.addLink(s2, s1, port1=1, port2=2, **linkparams)
         self.addLink(s3, s1, port1=1, port2=3, **linkparams)
         # self.addLink(s4, s1, port1=1, port2=4, **linkparams)
@@ -159,9 +159,10 @@ def create_network(config, is_containernet):
     o1 = net.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")  # Outsider
     if is_containernet:
         r1 = net.addDocker('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01", dimage="rightscale/openvas")  # Router
+        a2 = net.addDocker('a2', ip="10.0.1.2/24", mac="00:00:00:00:00:02", dimage="hal3002/metasploit")
     else:    
         r1 = net.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")
-    
+        a2 = net.addHost('a2', ip="10.0.1.2/24", mac="00:00:00:00:00:02")
 
     # Static number of switches
     linkparams = {'delay': '0.5ms'}  # Default link params
@@ -169,6 +170,7 @@ def create_network(config, is_containernet):
     s2 = net.addSwitch('s2', dpid='0000000000000002')
     s3 = net.addSwitch('s3', dpid='0000000000000003')
     net.addLink(s1, r1, port1=1, **linkparams)
+    net.addLink(s1, a2, port1=4, **linkparams)
     net.addLink(s2, s1, port1=1, port2=2, **linkparams)
     net.addLink(s3, s1, port1=1, port2=3, **linkparams)
     net.addLink(r1, o1, bw=10, delay='15ms')  # Delay is doubled as it is applied on interfaces

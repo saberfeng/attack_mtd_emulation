@@ -1,0 +1,76 @@
+sudo apt-get update
+    2  sudo apt-get upgrade
+    3  sudo apt-get install git build-essential libreadline-dev libssl-dev libpq5 libpq-dev libreadline5 libsqlite3-dev libpcap-dev default-jre git autoconf postgresql pgadmin3 curl zlib1g-dev libxml2-dev libxslt1-dev xtightvncviewer libyaml-dev curl zlib1g-dev libffi-dev libgmp-dev
+    4  \curl -sSL https://get.rvm.io | bash
+    5  source /usr/local/rvm/scripts/rvm
+    6  rvm -v
+    7  rvm install 2.1.6
+    8  rvm use 2.1.6 --default
+    9  ruby -v
+   10  ls
+   11  mkdir arsenal
+   12  nmap -v
+   13  su postgres
+   14  history
+   pwd
+    2  cd ..
+    3  ls
+    4  ll
+    5  cd home
+    6  ls
+    7  su postgres
+    8  cd /opt
+    9  sudo git clone https://github.com/rapid7/metasploit-framework.git
+   10  pwd
+   11  whoami
+   12  sudo git clone https://github.com/rapid7/metasploit-framework.git
+   13  gem
+   14  gem update
+   15  sudo chown -R `whoami` /opt/metasploit-framework
+   16  cd metasploit-framework
+   17  ls
+   18  gem install bundler
+   19  bundle install
+   20  gem install wirble sqlite3 bundler
+   21  bundle install
+   22  ls /var
+   23  ls /var/lib
+   24  ls /var/lib/gems/
+   25  ls /var/lib/gems/1.9.1/
+   26  ls /var/lib/gems/1.9.1/gems/
+   27  ls /opt
+   28  ls /usr/local/
+   29  ls /usr/local/rvm/gem
+   30  ls /usr/local/rvm/gems
+   31  ls /usr/local/rvm/gems/ruby-2.1.6
+   32  ls /usr/local/rvm/gems/ruby-2.1.6/bin
+   33  export /usr/local/rvm/gems/ruby-2.1.6/bin
+   34  export /usr/local/rvm/gems/ruby-2.1.6/bin:$PATH
+   35  export PATH=$PATH:/usr/local/rvm/gems/ruby-2.1.6/bin
+   36  ls
+   37  bundle install
+   38  gem install bundler
+   39  gen env version
+   40  gem env version
+   41  gem i rubygems-update -v '<3' && update_rubygems
+   42  bundle install
+   43  gem install bundle
+   44  ls /usr/local/rvm/gems/ruby-2.1.6/bin
+   45  cd /var/lib
+   46  ls
+   47  cd gems/
+   48  ls
+   49  cd 1.9.1/
+   50  ls
+   51  cd gems
+   52  ls
+   53  cd ..
+   54  ls
+   55  sudo apt-get install rubygems
+   56  gem update
+   57  ruby -version
+   58  gem -help
+   59  gem --help
+   60  gem list --local
+   61  rvm --help
+   62  history

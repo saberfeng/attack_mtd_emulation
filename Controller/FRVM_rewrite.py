@@ -39,6 +39,7 @@ class FRVM(app_manager.RyuApp):
         super(FRVM, self).__init__(*args, **kwargs)
         self.mac_to_switch_port = {}
         self.switch_connections = load_json_file("switch_connections.json")
+        self.switch_port_to_gateway = {}
         self.get_switch_port_to_gateway()
         self.config = load_json_file("./Ryu/hosts_ports.json")
         self.num_hosts = int(self.config.get("num_hosts"))
@@ -53,7 +54,7 @@ class FRVM(app_manager.RyuApp):
         # item -> ((rip, port), (vip, port))
         self.rip_to_vip = {}  # (rip, port) => (vip, port)
         self.allocate_vip(self.rip_to_vip)
-        self.pretty_print_rip_to_vip()
+        self.print_rip_to_vip()
 
         self.new_rip_to_vip = {} # next round
         self.allocate_vip(self.new_rip_to_vip)
@@ -61,23 +62,37 @@ class FRVM(app_manager.RyuApp):
         self.timer = Timer(self.lease_period, self.create_timer)
         self.started = time.time()
         self.timer.start()
-        self.arp_requests = {}
-    
-    def pretty_print_rip_to_vip(self):
+        self.arp_buffer = {}
+
+    def print_rip_to_vip(self):
+        metasploitable_vips = ""
         with open("rip_vip", "w") as f:
             for item in self.rip_to_vip.items():
+                # print vips
                 print(item)
-                f.write(str(item))
-                f.write("\n")
-
+                # write to file
+                f.write(str(item) + "\n")
+                # list all vips of 10.0.1.6
+                if item[0][0] == "10.0.1.6":
+                    metasploitable_vips += "," + item[1][0]
+            f.write(metasploitable_vips)
+        
+    # self.switch_port_to_gateway
+    # records those switch ports connecting between outside and FRVM network
+    # the "outside" can be in the same subnet
+    # structure: 
+    # {
+    #   datapath_id_1:[switch_port_1, switch_port_2],
+    #   datapath_id_2:[switch_port_1],
+    # }
     def get_switch_port_to_gateway(self):
         for datapath_id in self.switch_connections:
             for port in self.switch_connections[datapath_id]:
                 node_name, _ = self.switch_connections[datapath_id][port]
-                # if the node connected to this port is "r1", save this datapath and port
-                if re.match(r'^r\d+$', node_name): 
-                    self.switch_port_to_gateway = (datapath_id, int(port))
-                    return
+                # if the node connected to this port is "r1" or "a2", save this datapath and port
+                if re.match(r'^r\d+$|^a\d+$', node_name): 
+                    create_key_in_dict(self.switch_port_to_gateway, datapath_id, [])
+                    self.switch_port_to_gateway[datapath_id].append(int(port))
 
     def get_new_group_id(self):
         group_id = self.flood_group_id
@@ -239,7 +254,6 @@ class FRVM(app_manager.RyuApp):
                 ipv4_src=ipv4_src, 
                 ipv4_dst=ipv4_dst
             )
-            
     
     def ip_route(self, msg):
         in_port, datapath, datapath_id, pkt, eth_src, eth_dst = self.learn_mac_address(msg)
@@ -286,13 +300,18 @@ class FRVM(app_manager.RyuApp):
             arp_vip, _ = self.rip_to_vip.get((rip, Proto_ARP))
             return arp_vip
 
+    def save_to_arp_buffer(self, arp_vip, datapath_id, switch_port, outsider_address, original_arp_dst):
+        create_key_in_dict(self.arp_buffer, arp_vip, {})
+        create_key_in_dict(self.arp_buffer[arp_vip], datapath_id, {})
+        create_key_in_dict(self.arp_buffer[arp_vip][datapath_id], switch_port, {})
+        create_key_in_dict(self.arp_buffer[arp_vip][datapath_id][switch_port], outsider_address, [])
+        self.arp_buffer[arp_vip][datapath_id][switch_port][outsider_address].append(original_arp_dst)
+        
     def modify_packets_from_gateway(self, datapath, datapath_id, in_port, arp_pkt):
-        if datapath_id == self.switch_port_to_gateway[0] and \
-           in_port == self.switch_port_to_gateway[1]:
+        if datapath_id in self.switch_port_to_gateway and \
+           in_port in self.switch_port_to_gateway[datapath_id]:
             arp_vip = self.find_arp_vip(arp_pkt.dst_ip)
-            if arp_vip not in self.arp_requests:
-                self.arp_requests[arp_vip] = []
-            self.arp_requests[arp_vip].append(arp_pkt.dst_ip)
+            self.save_to_arp_buffer(arp_vip, datapath_id, in_port, arp_pkt.src_ip, arp_pkt.dst_ip)
             arp_pkt.dst_ip = arp_vip 
             return [datapath.ofproto_parser.OFPActionSetField(arp_tpa=arp_vip)]
         return []
@@ -393,6 +412,23 @@ class FRVM(app_manager.RyuApp):
                                   in_port=int(in_port), actions=actions, data=data)
         datapath.send_msg(out)
     
+    def query_and_pop_arp(self, arp_vip, datapath_id, switch_port, outsider_address):
+        if arp_vip not in self.arp_buffer or\
+            datapath_id not in self.arp_buffer[arp_vip] or\
+            switch_port not in self.arp_buffer[arp_vip][datapath_id] or\
+            outsider_address not in self.arp_buffer[arp_vip][datapath_id][switch_port] or\
+            len(self.arp_buffer[arp_vip][datapath_id][switch_port][outsider_address]) == 0:
+            return None
+        else:
+            return self.arp_buffer[arp_vip][datapath_id][switch_port][outsider_address].pop(0)
+    
+    def get_arp_translating_action(self, datapath, arp_vip, datapath_id, switch_port, outsider_address):
+        arp_dst_before_modify = self.query_and_pop_arp(arp_vip, datapath_id, switch_port, outsider_address)
+        if arp_dst_before_modify:
+            return [datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify)]
+        else:
+            return []
+
     def get_actions(self, datapath, in_port, out_port, src_ip, dst_ip, src_port, dst_port, protocol):
         datapath_id = str(datapath.id).zfill(16)
         from_edge_port = self.is_edge_port(datapath_id, in_port, protocol)
@@ -405,13 +441,13 @@ class FRVM(app_manager.RyuApp):
             actions = []
             # arp response to gateway
             if protocol == Proto_ARP and\
-                datapath_id == self.switch_port_to_gateway[0] and\
-                out_port == self.switch_port_to_gateway[1] and\
-                src_ip in self.arp_requests and\
-                len(self.arp_requests[src_ip]) > 0:
-
-                arp_dst_before_modify = self.arp_requests[src_ip].pop(0)
-                actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
+                datapath_id in self.switch_port_to_gateway and\
+                out_port in self.switch_port_to_gateway[datapath_id]:
+                # arp_dst_before_modify = self.query_and_pop_arp(src_ip, datapath_id, out_port, dst_ip)
+                # if arp_dst_before_modify:
+                #     actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
+                actions += self.get_arp_translating_action(datapath, src_ip, datapath_id, out_port, dst_ip)
+                
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif from_edge_port and not to_edge_port:
             actions = []
@@ -426,17 +462,16 @@ class FRVM(app_manager.RyuApp):
                 proto_to_param_arg = { Proto_IPv4:{"ipv4_dst":new_dst_ip}, Proto_ARP:{"arp_tpa":new_dst_ip} }
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             
-
+            arp_vip, _ = self.rip_to_vip.get((src_ip, Proto_ARP))
             # arp response to gateway
             if protocol == Proto_ARP and\
-                datapath_id == self.switch_port_to_gateway[0] and\
-                out_port == self.switch_port_to_gateway[1]:
-
-                arp_vip, _ = self.rip_to_vip.get((src_ip, Proto_ARP))
-                if arp_vip in self.arp_requests and len(self.arp_requests[arp_vip])>0:
-                    arp_dst_before_modify = self.arp_requests[arp_vip].pop(0)
-                    actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
-
+                datapath_id in self.switch_port_to_gateway and\
+                out_port in self.switch_port_to_gateway[datapath_id]:
+                
+                actions += self.get_arp_translating_action(datapath, arp_vip, datapath_id, out_port, dst_ip)
+                # arp_dst_before_modify = self.query_and_pop_arp(arp_vip, datapath_id, out_port, dst_ip)
+                # if arp_dst_before_modify:
+                #     actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif not from_edge_port and to_edge_port:
             actions = []
@@ -459,7 +494,7 @@ class FRVM(app_manager.RyuApp):
 
     def is_edge_port(self, datapath_id, port, protocol) -> bool:
         connected_node_name, _ = self.switch_connections.get(datapath_id).get(str(port))
-        if re.match(r'^s\d+$|^r\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
+        if re.match(r'^s\d+$|^r\d+$|^a\d+$', connected_node_name): # this port is connected to a switch -> non-edge port
             return False
         elif re.match(r'^h\d+$', connected_node_name): # this port is connected to a host -> edge port
             return True
@@ -484,4 +519,7 @@ def find_in_dict(dictionary:dict, match, method=lambda x: x):
             return item
     return False
 
-
+# create key if it doesn't exists in the dictionary
+def create_key_in_dict(dictionary, key, default_value):
+    if key not in dictionary:
+        dictionary[key] = default_value
