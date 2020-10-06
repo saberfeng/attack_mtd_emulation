@@ -422,7 +422,18 @@ class FRVM(app_manager.RyuApp):
         else:
             return self.arp_buffer[arp_vip][datapath_id][switch_port][outsider_address].pop(0)
     
-    def get_arp_translating_action(self, datapath, arp_vip, datapath_id, switch_port, outsider_address):
+    def get_arp_translating_action(self, 
+            protocol, datapath, out_port, arp_vip, datapath_id, switch_port, outsider_address):
+        # arp response to gateway
+        if protocol == Proto_ARP and\
+           datapath_id in self.switch_port_to_gateway and\
+           out_port in self.switch_port_to_gateway[datapath_id]:
+            arp_dst_before_modify = self.query_and_pop_arp(arp_vip, datapath_id, switch_port, outsider_address)
+            if arp_dst_before_modify:
+                return [datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify)]
+        return []
+
+    def get_arp_translating_action_old(self, datapath, arp_vip, datapath_id, switch_port, outsider_address):
         arp_dst_before_modify = self.query_and_pop_arp(arp_vip, datapath_id, switch_port, outsider_address)
         if arp_dst_before_modify:
             return [datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify)]
@@ -439,15 +450,7 @@ class FRVM(app_manager.RyuApp):
             
         elif not from_edge_port and not to_edge_port:
             actions = []
-            # arp response to gateway
-            if protocol == Proto_ARP and\
-                datapath_id in self.switch_port_to_gateway and\
-                out_port in self.switch_port_to_gateway[datapath_id]:
-                # arp_dst_before_modify = self.query_and_pop_arp(src_ip, datapath_id, out_port, dst_ip)
-                # if arp_dst_before_modify:
-                #     actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
-                actions += self.get_arp_translating_action(datapath, src_ip, datapath_id, out_port, dst_ip)
-                
+            actions += self.get_arp_translating_action(protocol, datapath, out_port, src_ip, datapath_id, out_port, dst_ip)
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif from_edge_port and not to_edge_port:
             actions = []
@@ -463,15 +466,7 @@ class FRVM(app_manager.RyuApp):
                 actions.append(datapath.ofproto_parser.OFPActionSetField(**proto_to_param_arg[protocol]))
             
             arp_vip, _ = self.rip_to_vip.get((src_ip, Proto_ARP))
-            # arp response to gateway
-            if protocol == Proto_ARP and\
-                datapath_id in self.switch_port_to_gateway and\
-                out_port in self.switch_port_to_gateway[datapath_id]:
-                
-                actions += self.get_arp_translating_action(datapath, arp_vip, datapath_id, out_port, dst_ip)
-                # arp_dst_before_modify = self.query_and_pop_arp(arp_vip, datapath_id, out_port, dst_ip)
-                # if arp_dst_before_modify:
-                #     actions.append(datapath.ofproto_parser.OFPActionSetField(arp_spa=arp_dst_before_modify))
+            actions += self.get_arp_translating_action(protocol, datapath, out_port, arp_vip, datapath_id, out_port, dst_ip)
             actions.append(datapath.ofproto_parser.OFPActionOutput(out_port))
         elif not from_edge_port and to_edge_port:
             actions = []
