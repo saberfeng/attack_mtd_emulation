@@ -41,7 +41,7 @@ def read_config():
 
 #------------------Containernet---------------------------------------------------------------------------------------
 
-def create_network(config, is_containernet):
+def create_network(config, is_containernet, mode):
     net = Containernet(controller=RemoteController, link=TCLink)
     net.addController(name="c0", ip='127.0.0.1', port=6653)
     
@@ -49,10 +49,13 @@ def create_network(config, is_containernet):
     controller_type = config.get("controller_type")
 
     o1 = net.addHost('o1', ip="10.0.4.10/22", mac="00:00:00:00:01:01")  # Outsider
-    if is_containernet:
+    if mode == ALL_CONTAINER or mode == ONE_VUL_TWO_ATTACKER:
         r1 = net.addDocker('r1', ip="10.0.0.1/22", mac="00:00:00:00:00:01", dimage="rightscale/openvas")  # Router
         a2 = net.addDocker('a2', ip="10.0.0.2/22", mac="00:00:00:00:00:02", dimage="hal3002/metasploit")
-    else:    
+    elif mode == ALL_VUL_ONE_ATTACKER:
+        r1 = net.addDocker('r1', ip="10.0.0.1/22", mac="00:00:00:00:00:01", dimage="rightscale/openvas")  # Router
+        a2 = net.addHost('a2', ip="10.0.0.2/22", mac="00:00:00:00:00:02")
+    elif mode == NO_CONTAINER:    
         r1 = net.addHost('r1', ip="10.0.0.1/22", mac="00:00:00:00:00:01")
         a2 = net.addHost('a2', ip="10.0.0.2/22", mac="00:00:00:00:00:02")
 
@@ -70,15 +73,28 @@ def create_network(config, is_containernet):
 
     # rIPs of hosts begin from 2
     for i in range(3, 3 + int(num_hosts)):
-        if i == 6 and is_containernet:
-            # h6 : metasploitable
-            host = net.addDocker("h{}".format(i), ip="10.0.0.{}/22".format(i), dimage="tleemcjr/metasploitable2")
-        else:
-            host = net.addHost("h{}".format(i), ip="10.0.0.{}/22".format(i))
+        # if i == 6 and is_containernet:
+        #     # h6 : metasploitable
+        #     host = net.addDocker("h{}".format(i), ip="10.0.0.{}/22".format(i), dimage="tleemcjr/metasploitable2")
+        # else:
+        #     host = net.addHost("h{}".format(i), ip="10.0.0.{}/22".format(i))
+        host = create_host(net, i, mode)
         net.addLink(next(c), host, **linkparams)
     return net
 
-def start_network(net, config, is_containernet):
+def create_host(net, index, mode):
+    if mode == ALL_CONTAINER or mode == ALL_VUL_ONE_ATTACKER:
+        return net.addDocker("h{}".format(index), ip="10.0.0.{}/22".format(index), dimage="tleemcjr/metasploitable2")
+    elif mode == ONE_VUL_TWO_ATTACKER: # only h6 is a metasploitable container
+        if index == 6:
+            return net.addDocker("h{}".format(index), ip="10.0.0.{}/22".format(index), dimage="tleemcjr/metasploitable2")
+        else:
+            return net.addHost("h{}".format(index), ip="10.0.0.{}/22".format(index))
+    elif mode == NO_CONTAINER:
+        return net.addHost("h{}".format(index), ip="10.0.0.{}/22".format(index))
+
+
+def start_network(net, config, is_containernet, mode):
     # Fetch all hosts from the network
     r1 = net.get('r1')
     o1 = net.get('o1')
@@ -90,28 +106,69 @@ def start_network(net, config, is_containernet):
     topo_helper.add_default_route(net, r1.IP())
     o1.cmd("ip route add default via 10.0.4.1")
 
-    if is_containernet:
-        h6 = net.get('h6')
-        # start Metasploitable services
-        h6.cmd("/bin/services.sh")
-        # start openvas services
-        r1.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
-        r1.cmd("openvas-mkcert-client -i -n")
-        r1.cmd('openvasmd '+\
-            '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
-            '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
-            '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
-            '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
-        r1.cmd('service redis-server restart')
-        r1.cmd('/openvas/startup.sh & ')
-        # r1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
-    else:
-        # Opening udp ports
-        topo_helper.open_host_ports(net, config, "udp")
+    # if is_containernet:
+    #     h6 = net.get('h6')
+    #     # start Metasploitable services
+    #     h6.cmd("/bin/services.sh")
+    #     # start openvas services
+    #     r1.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
+    #     r1.cmd("openvas-mkcert-client -i -n")
+    #     r1.cmd('openvasmd '+\
+    #         '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
+    #         '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
+    #         '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
+    #         '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
+    #     r1.cmd('service redis-server restart')
+    #     r1.cmd('/openvas/startup.sh & ')
+    #     # r1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
+    # else:
+    #     # Opening udp ports
+    #     topo_helper.open_host_ports(net, config, "udp")
+    configure_hosts(net, mode, config)
     generate_switch_connections_file(net)
     net.start()
     CLI(net)
     net.stop()
+
+def configure_hosts(net, mode, config):
+    if mode == ALL_CONTAINER:
+        # start openvas services
+        r1 = net.get('r1')
+        start_host_openvas_services(r1)
+        # start metasploitable services
+        # h3 ~ h7
+        for i in range(3, 8):
+            h = net.get("h{}".format(i))
+            h.cmd("/bin/services.sh")
+    elif mode == ALL_VUL_ONE_ATTACKER:
+        # start openvas services
+        r1 = net.get('r1')
+        start_host_openvas_services(r1)
+        # start metasploitable services
+        # h3 ~ h7
+        for i in range(3, 8):
+            h = net.get("h{}".format(i))
+            h.cmd("/bin/services.sh")
+    elif mode == ONE_VUL_TWO_ATTACKER:
+        # start openvas services
+        r1 = net.get('r1')
+        start_host_openvas_services(r1)
+        # start metasploitable services
+        h6 = net.get('h6')
+        h6.cmd("/bin/services.sh")
+    elif mode == NO_CONTAINER:
+        topo_helper.open_host_ports(net, config, "udp")
+
+def start_host_openvas_services(host):
+    host.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
+    host.cmd("openvas-mkcert-client -i -n")
+    host.cmd('openvasmd '+\
+        '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
+        '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
+        '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
+        '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
+    host.cmd('service redis-server restart')
+    host.cmd('/openvas/startup.sh & ')
 
 def generate_switch_connections_file(net):
     result = {}
@@ -137,17 +194,19 @@ def get_connected_interface(interface):
         link_intfs.remove(interface) # remove itself, the left is the other interface
         return link_intfs[0]
 
+# network modes
+ALL_CONTAINER = 1 # all hosts are containers
+ALL_VUL_ONE_ATTACKER = 2
+ONE_VUL_TWO_ATTACKER = 3 # one vulnerable container, two attackers(openvas and metasploit)
+NO_CONTAINER = 4 # all hosts are not container
+
+
 def main():
-    # if len(sys.argv) < 2:
-    #     print("*** Error: Missing parameters ***")
-    # else:
-    #     topo = sys.argv[1]
-    #     top = Topos.get(topo, lambda x: x)()
-    #     top.run()
     config = read_config()
     is_containernet = True
-    net = create_network(config, is_containernet)
-    start_network(net, config, is_containernet)
+    selected_mode = ALL_VUL_ONE_ATTACKER # network mode
+    net = create_network(config, is_containernet, selected_mode)
+    start_network(net, config, is_containernet, selected_mode)
 
 
 if __name__ == '__main__':
