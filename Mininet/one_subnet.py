@@ -39,110 +39,110 @@ def read_config():
     f.close()
     return content
 
-class NmapNetwork(Topo):
-    """
-    Configures a network containing
-    """
-    def __init__(self):
-        Topo.__init__(self)
+# class NmapNetwork(Topo):
+#     """
+#     Configures a network containing
+#     """
+#     def __init__(self):
+#         Topo.__init__(self)
 
-        self.config = read_config()
-        self.num_hosts = int(self.config.get("num_hosts"))
-        self.controller_type = self.config.get("controller_type")
+#         self.config = read_config()
+#         self.num_hosts = int(self.config.get("num_hosts"))
+#         self.controller_type = self.config.get("controller_type")
 
-        r1 = self.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")  # Router
-        o1 = self.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")  # Outsider
+#         r1 = self.addHost('r1', ip="10.0.1.1/24", mac="00:00:00:00:00:01")  # Router
+#         o1 = self.addHost('o1', ip="10.0.2.10/24", mac="00:00:00:00:01:01")  # Outsider
 
-        # Static number of switches
-        linkparams = {'delay': '0.5ms'}  # Default link params
-        s1 = self.addSwitch('s1', dpid='0000000000000001')
-        s2 = self.addSwitch('s2', dpid='0000000000000002')
-        s3 = self.addSwitch('s3', dpid='0000000000000003')
-        # s4 = self.addSwitch('s4', dpid='0000000000000004')
-        # s5 = self.addSwitch('s5', dpid='0000000000000005')
-        self.addLink(s1, r1, port1=1, **linkparams)
-        self.addLink(s2, s1, port1=1, port2=2, **linkparams)
-        self.addLink(s3, s1, port1=1, port2=3, **linkparams)
-        # self.addLink(s4, s1, port1=1, port2=4, **linkparams)
-        # self.addLink(s5, s1, port1=1, port2=5, **linkparams)
-        self.addLink(r1, o1, bw=10, delay='15ms')  # Delay is doubled as it is applied on interfaces
-        c = cycle([s1, s2, s3])
+#         # Static number of switches
+#         linkparams = {'delay': '0.5ms'}  # Default link params
+#         s1 = self.addSwitch('s1', dpid='0000000000000001')
+#         s2 = self.addSwitch('s2', dpid='0000000000000002')
+#         s3 = self.addSwitch('s3', dpid='0000000000000003')
+#         # s4 = self.addSwitch('s4', dpid='0000000000000004')
+#         # s5 = self.addSwitch('s5', dpid='0000000000000005')
+#         self.addLink(s1, r1, port1=1, **linkparams)
+#         self.addLink(s2, s1, port1=1, port2=2, **linkparams)
+#         self.addLink(s3, s1, port1=1, port2=3, **linkparams)
+#         # self.addLink(s4, s1, port1=1, port2=4, **linkparams)
+#         # self.addLink(s5, s1, port1=1, port2=5, **linkparams)
+#         self.addLink(r1, o1, bw=10, delay='15ms')  # Delay is doubled as it is applied on interfaces
+#         c = cycle([s1, s2, s3])
 
-        # rIPs of hosts begin from 2
-        for i in range(3, 3 + int(self.num_hosts)):
-            if i == 3:
-                # h3 : openvas
-                host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i), dimage="rightscale/openvas")
-            elif i == 6:
-                # h6 : metasploitable
-                host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i), dimage="tleemcjr/metasploitable2")
-            else:
-                host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i))
-            self.addLink(next(c), host, **linkparams)
+#         # rIPs of hosts begin from 2
+#         for i in range(3, 3 + int(self.num_hosts)):
+#             if i == 3:
+#                 # h3 : openvas
+#                 host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i), dimage="rightscale/openvas")
+#             elif i == 6:
+#                 # h6 : metasploitable
+#                 host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i), dimage="tleemcjr/metasploitable2")
+#             else:
+#                 host = self.addHost("h{}".format(i), ip="10.0.1.{}/24".format(i))
+#             self.addLink(next(c), host, **linkparams)
 
-    # def port_per_host(self):
-    #     """
-    #     Find the minimum size of a set of ports inwhich there is a single port per host
-    #     :return:
-    #     """
-    #     port_set = set()
-    #     for i in range(self.num_hosts):
-    #         port_set.add(self.config.get(str(i))[0])
-    #     return port_set
+#     # def port_per_host(self):
+#     #     """
+#     #     Find the minimum size of a set of ports inwhich there is a single port per host
+#     #     :return:
+#     #     """
+#     #     port_set = set()
+#     #     for i in range(self.num_hosts):
+#     #         port_set.add(self.config.get(str(i))[0])
+#     #     return port_set
 
-    def run(self):
-        controller = RemoteController('c0', '127.0.0.1', 6653)
+#     def run(self):
+#         controller = RemoteController('c0', '127.0.0.1', 6653)
 
-        net = Containernet(topo=self, controller=controller, link=TCLink)
-        # Fetch all hosts from the network
-        r1 = net.get('r1')
-        o1 = net.get('o1')
+#         net = Containernet(topo=self, controller=controller, link=TCLink)
+#         # Fetch all hosts from the network
+#         r1 = net.get('r1')
+#         o1 = net.get('o1')
 
-        # Extra configurations to network
-        net.start()
-        topo_helper.disable_ipv6(net)
-        topo_helper.configure_router(r1, ("10.0.1.1/24", "10.0.2.1/24")) # add two subnet interfaces to router1
-        topo_helper.add_default_route(net, r1.IP())
-        o1.cmd("ip route add default via 10.0.2.1")
+#         # Extra configurations to network
+#         net.start()
+#         topo_helper.disable_ipv6(net)
+#         topo_helper.configure_router(r1, ("10.0.1.1/24", "10.0.2.1/24")) # add two subnet interfaces to router1
+#         topo_helper.add_default_route(net, r1.IP())
+#         o1.cmd("ip route add default via 10.0.2.1")
 
-        # Opening correct ports
-        topo_helper.open_host_ports(net, self.config, "udp")
-        # scan_type = self.config.get("scan_type")
-        # if scan_type in TCP_SCANS:
-        #     topo_helper.open_host_ports(net, self.config, "tcp") # open http servers on given ports
-        # elif scan_type in UDP_SCANS:
-        #     topo_helper.open_host_ports(net, self.config, "udp")
-        self.generate_switch_connections_file(net)
-        net.start()
-        CLI(net)
-        net.stop()
+#         # Opening correct ports
+#         topo_helper.open_host_ports(net, self.config, "udp")
+#         # scan_type = self.config.get("scan_type")
+#         # if scan_type in TCP_SCANS:
+#         #     topo_helper.open_host_ports(net, self.config, "tcp") # open http servers on given ports
+#         # elif scan_type in UDP_SCANS:
+#         #     topo_helper.open_host_ports(net, self.config, "udp")
+#         self.generate_switch_connections_file(net)
+#         net.start()
+#         CLI(net)
+#         net.stop()
     
-    def generate_switch_connections_file(self, net):
-        result = {}
-        for switch in net.switches:
-            result[switch.dpid] = {}
-            for port in switch.intfs:
-                if port == 0: # port0 is loopback
-                    continue
-                interface = switch.intfs[port]
-                connected_interface = self.get_connected_interface(interface)
-                connected_node = connected_interface.node
-                if re.match(r'^h\d+$|^r\d+$', connected_node.name):
-                    result[switch.dpid][port] = (connected_node.name, connected_interface.ip)
-                elif re.match(r'^s\d+$', connected_node.name):
-                    result[switch.dpid][port] = (connected_node.name, connected_node.dpid)
-        print(result)
-        with open("switch_connections.json", "w") as f:
-            json.dump(result, f, indent=4, sort_keys=True)
+#     def generate_switch_connections_file(self, net):
+#         result = {}
+#         for switch in net.switches:
+#             result[switch.dpid] = {}
+#             for port in switch.intfs:
+#                 if port == 0: # port0 is loopback
+#                     continue
+#                 interface = switch.intfs[port]
+#                 connected_interface = self.get_connected_interface(interface)
+#                 connected_node = connected_interface.node
+#                 if re.match(r'^h\d+$|^r\d+$', connected_node.name):
+#                     result[switch.dpid][port] = (connected_node.name, connected_interface.ip)
+#                 elif re.match(r'^s\d+$', connected_node.name):
+#                     result[switch.dpid][port] = (connected_node.name, connected_node.dpid)
+#         print(result)
+#         with open("switch_connections.json", "w") as f:
+#             json.dump(result, f, indent=4, sort_keys=True)
     
-    def get_connected_interface(self, interface):
-        if interface.link: # interface itself is in a link
-            link_intfs = [ interface.link.intf1, interface.link.intf2 ]
-            link_intfs.remove(interface) # remove itself, the left is the other interface
-            return link_intfs[0]
+#     def get_connected_interface(self, interface):
+#         if interface.link: # interface itself is in a link
+#             link_intfs = [ interface.link.intf1, interface.link.intf2 ]
+#             link_intfs.remove(interface) # remove itself, the left is the other interface
+#             return link_intfs[0]
 
 
-Topos["NmapNetwork"] = NmapNetwork
+# Topos["NmapNetwork"] = NmapNetwork
 
 
 

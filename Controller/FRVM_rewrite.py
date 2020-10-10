@@ -2,6 +2,7 @@ import json
 import time
 from collections import namedtuple
 from threading import Timer
+from datetime import datetime
 import re
 
 # Ryu app and OpenFlow libraries
@@ -50,7 +51,7 @@ class FRVM(app_manager.RyuApp):
         self.init_flood_group_ids()
 
         self.dhcp_server = FRVM_DHCPServer(ADDRESS.address, ADDRESS.netmask, STATIC_IPS,
-                                      ('10.0.1.{}'.format(self.num_hosts + 4), '10.0.1.254'))
+                                      ('10.0.0.{}'.format(self.num_hosts + 4), '10.0.3.254'))
         # item -> ((rip, port), (vip, port))
         self.rip_to_vip = {}  # (rip, port) => (vip, port)
         self.allocate_vip(self.rip_to_vip)
@@ -67,13 +68,14 @@ class FRVM(app_manager.RyuApp):
     def print_rip_to_vip(self):
         metasploitable_vips = ""
         with open("rip_vip", "w") as f:
+            f.write(str(datetime.now()) + "\n")
             for item in self.rip_to_vip.items():
                 # print vips
                 print(item)
                 # write to file
                 f.write(str(item) + "\n")
-                # list all vips of 10.0.1.6
-                if item[0][0] == "10.0.1.6":
+                # list all vips of 10.0.0.6
+                if item[0][0] == "10.0.0.6":
                     metasploitable_vips += "," + item[1][0]
             f.write(metasploitable_vips)
         
@@ -131,6 +133,7 @@ class FRVM(app_manager.RyuApp):
         print("*** Generating next round vips ***")
         self.rip_to_vip = self.new_rip_to_vip
         self.new_rip_to_vip = {}
+        self.print_rip_to_vip()
 
         self.allocate_vip(self.new_rip_to_vip)
         self.dhcp_server.release_all()
@@ -143,10 +146,10 @@ class FRVM(app_manager.RyuApp):
     def allocate_vip(self, rip_to_vip):
         for i in range(self.num_hosts):
             ports = self.config.get(str(i))
-            rip = "10.0.1.{}".format(3+i)
+            rip = "10.0.0.{}".format(3+i)
             # print("host {} opening ports {}".format(rip, " ".join(map(str, ports))))
             for port in ports + [Proto_ARP, "ICMP"]: # extra for portless protocols ARP, ICMP
-                rip_to_vip[(rip, port)] = self.dhcp_server.request("10.0.1.{}".format(i), port)
+                rip_to_vip[(rip, port)] = self.dhcp_server.request("10.0.0.{}".format(i), port)
         self.dhcp_server.release_all()
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
