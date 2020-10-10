@@ -1,0 +1,34 @@
+tcp        0      0 0.0.0.0:445             0.0.0.0:*               LISTEN      690/smbd        
+tcp        0      0 0.0.0.0:37759           0.0.0.0:*               LISTEN      954/rmiregistry 
+tcp        0      0 0.0.0.0:512             0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:513             0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:514             0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:8009            0.0.0.0:*               LISTEN      840/jsvc        
+tcp        0      0 0.0.0.0:6697            0.0.0.0:*               LISTEN      971/unrealircd  
+tcp        0      0 0.0.0.0:3306            0.0.0.0:*               LISTEN      254/mysqld      
+tcp        0      0 0.0.0.0:1099            0.0.0.0:*               LISTEN      954/rmiregistry 
+tcp        0      0 0.0.0.0:6667            0.0.0.0:*               LISTEN      971/unrealircd  
+tcp        0      0 0.0.0.0:139             0.0.0.0:*               LISTEN      690/smbd        
+tcp        0      0 0.0.0.0:5900            0.0.0.0:*               LISTEN      970/Xtightvnc   
+tcp        0      0 0.0.0.0:111             0.0.0.0:*               LISTEN      443/portmap     
+tcp        0      0 0.0.0.0:6000            0.0.0.0:*               LISTEN      970/Xtightvnc   
+tcp        0      0 0.0.0.0:3632            0.0.0.0:*               LISTEN      158/distccd     
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      68/apache2      
+tcp        0      0 0.0.0.0:8787            0.0.0.0:*               LISTEN      958/ruby        
+tcp        0      0 0.0.0.0:8180            0.0.0.0:*               LISTEN      840/jsvc        
+tcp        0      0 0.0.0.0:1524            0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:21              0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      746/sshd        
+tcp        0      0 0.0.0.0:23              0.0.0.0:*               LISTEN      975/xinetd      
+tcp        0      0 0.0.0.0:5432            0.0.0.0:*               LISTEN      575/postgres    
+tcp        0      0 0.0.0.0:25              0.0.0.0:*               LISTEN      531/master                 
+tcp6       0      0 0.0.0.0:2121                 :::*                    LISTEN      627/proftpd: (accep
+tcp6       0      0 0:5432                 :::*                    LISTEN      575/postgres    
+udp        0      0 0.0.0.0:69              0.0.0.0:*                           975/xinetd      
+udp        0      0 0.0.0.0:111             0.0.0.0:*                           443/portmap     
+udp        0      0 172.17.0.4:137          0.0.0.0:*                           688/nmbd        
+udp        0      0 10.0.0.6:137            0.0.0.0:*                           688/nmbd        
+udp        0      0 0.0.0.0:137             0.0.0.0:*                           688/nmbd        
+udp        0      0 172.17.0.4:138          0.0.0.0:*                           688/nmbd        
+udp        0      0 10.0.0.6:138            0.0.0.0:*                           688/nmbd        
+udp        0      0 0.0.0.0:138             0.0.0.0:*                           688/nmbd      
