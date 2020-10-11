@@ -104,7 +104,7 @@ def remove_all_ARP_cache(net):
     :param net: Mininet network object
     :return: None
     """
-    run_commands(net.hosts, ["ip - s - s neigh flush all"], lambda x: re.match(r'h\d+', x.name))
+    run_commands(net.hosts, ["ip - s - s neigh flush all"], lambda x: re.match(r'h\d+|r\d+|a\d+', x.name))
 
 
 def disable_ipv6(net):
@@ -118,6 +118,11 @@ def disable_ipv6(net):
         node.cmd('sysctl -w net.ipv6.conf.all.disable_ipv6=1')
         node.cmd('sysctl -w net.ipv6.conf.default.disable_ipv6=1')
         node.cmd('sysctl -w net.ipv6.conf.lo.disable_ipv6=1')
+
+def delete_all_flows(net):
+    for switch in net.switches:
+        switch.cmd("ovs-ofctl del-flows -O OpenFlow13 {}".format(switch.name))
+        switch.cmd("ovs-ofctl del-groups -O OpenFlow13 {}".format(switch.name))
 
 
 def del_switch_flows(switch):

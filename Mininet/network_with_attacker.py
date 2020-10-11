@@ -126,9 +126,44 @@ def start_network(net, config, is_containernet, mode):
     #     topo_helper.open_host_ports(net, config, "udp")
     configure_hosts(net, mode, config)
     generate_switch_connections_file(net)
-    net.start()
+    nmap_scanning(net, config)
     CLI(net)
     net.stop()
+
+def nmap_scanning(net, config):
+    # timeout
+    timeout_value = config.get("nmap_time_out")
+    if timeout_value == 0:
+        timeout = ""
+        timeout_str = "0"
+    else:
+        timeout = "timeout {}".format(timeout_value)
+        timeout_str = timeout
+    # scan type
+    scan_type = config.get("nmap_scan_type")
+    # ports discovered
+    if config.get("nmap_port_discovered"):
+        port_list = config.get("0")
+        ports = "-p {}".format(",".join(map(str, port_list)))
+        ports_str = "discovered"
+    else:
+        ports = "-p 1-9000"
+        ports_str = "1-9000"
+    specifics = "--max-retries 0 --max-rtt-timeout 1000ms"
+
+    r1 = net.get('r1')
+    for i in range(50):
+        file_name = "nmap_Time{}_Scan{}_Port{}_{}.xml".format(
+            timeout_str, scan_type, ports_str, i)
+        command = "{} nmap -{} {} -oX {} --exclude 10.0.0.1,10.0.0.2 -Pn {} 10.0.0.0/22".format(
+            timeout, scan_type, ports, file_name, specifics)
+        print(command)
+        r1.cmd(command)
+
+        # important
+        # topo_helper.delete_all_flows(net)
+        topo_helper.remove_all_ARP_cache(net)
+
 
 def configure_hosts(net, mode, config):
     if mode == ALL_CONTAINER:
@@ -204,7 +239,7 @@ NO_CONTAINER = 4 # all hosts are not container
 def main():
     config = read_config()
     is_containernet = True
-    selected_mode = ALL_VUL_ONE_ATTACKER # network mode
+    selected_mode = ALL_CONTAINER # network mode
     net = create_network(config, is_containernet, selected_mode)
     start_network(net, config, is_containernet, selected_mode)
 

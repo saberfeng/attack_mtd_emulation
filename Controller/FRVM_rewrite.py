@@ -67,16 +67,16 @@ class FRVM(app_manager.RyuApp):
 
     def print_rip_to_vip(self):
         metasploitable_vips = ""
-        with open("rip_vip", "w") as f:
-            f.write(str(datetime.now()) + "\n")
+        with open("rip_vip", "a+") as f:
+            f.write("\ntime: " + str(datetime.now()) + "\n")
             for item in self.rip_to_vip.items():
                 # print vips
                 print(item)
                 # write to file
                 f.write(str(item) + "\n")
-                # list all vips of 10.0.0.6
-                if item[0][0] == "10.0.0.6":
-                    metasploitable_vips += "," + item[1][0]
+                # # list all vips of 10.0.0.6
+                # if item[0][0] == "10.0.0.6":
+                #     metasploitable_vips += "," + item[1][0]
             f.write(metasploitable_vips)
         
     # self.switch_port_to_gateway
@@ -339,23 +339,6 @@ class FRVM(app_manager.RyuApp):
             # we have to let this controller set arp_spa dynamically
             self.packet_out(msg, actions, in_port)
 
-            # if msg.buffer_id == datapath.ofproto.OFP_NO_BUFFER:
-            #     self.add_flow(
-            #         datapath=datapath, 
-            #         priority=2, 
-            #         match=match,
-            #         actions=actions,
-            #         hard_timeout=self.remaining_time())
-            #     self.packet_out(msg, actions, in_port)
-            # else:
-            #     self.add_flow(
-            #         datapath=datapath, 
-            #         priority=2, 
-            #         match=match,
-            #         actions=actions,
-            #         hard_timeout=self.remaining_time(),
-            #         buffer_id=msg.buffer_id)
-            #     return
         else: 
             # we flood this packet
             # all arp request will be flooded, since we can't learn the MAC address: 00:00:00:00.....

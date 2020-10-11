@@ -2,3 +2,4 @@ rip_vip
 nmap
 tmp_*
 .vscode
+*.pyc

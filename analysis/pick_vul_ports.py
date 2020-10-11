@@ -9,10 +9,12 @@ def run():
     port_str = ""
     port_list = list(ports_set)
     port_list = sorted(port_list)
+    oneline_str = ""
     for port in port_list:
+        oneline_str += str(port) + ","
         port_str += str(port) + ",\n"
     print(port_str)
-
+    print(oneline_str)
 
 if __name__ == "__main__":
     run()

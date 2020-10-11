@@ -1,0 +1,13 @@
+# nmap scanning experiments
+
+# timeout ;  TCP/UDP scan types ; ports discovered ; 
+timeout 300  nmap  -sS            -p 21,22,23       -oX filename.xml --exclude 10.0.0.1,10.0.0.2  -Pn   10.0.0.0/22
+
+
+
+
+## done:
+simple_switch_13:
+"nmap_scan_type":"sS",
+"nmap_time_out":0,
+"nmap_port_discovered":false
