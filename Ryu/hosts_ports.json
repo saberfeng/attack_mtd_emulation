@@ -147,12 +147,12 @@
     ],
     "MTD_interval_scan":0,
     "single_port":false,
-    "mtd_time":300,
+    "mtd_time":400,
     "num_ports":10,
     "ports_discovered":true,
     "num_hosts":5,
 
     "nmap_scan_type":"sS",
-    "nmap_time_out":300,
+    "nmap_time_out":400,
     "nmap_port_discovered":false
 }
