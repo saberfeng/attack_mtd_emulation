@@ -1,0 +1,114 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 6.40 scan initiated Sun Oct 11 10:11:11 2020 as: nmap -sS -p 1-9000 -oX nmap_Time0_ScansS_Port1-9000_40.xml -&#45;exclude 10.0.0.1,10.0.0.2 -Pn -&#45;max-retries 0 -&#45;max-rtt-timeout 1000ms 10.0.0.0/22 -->
+<nmaprun scanner="nmap" args="nmap -sS -p 1-9000 -oX nmap_Time0_ScansS_Port1-9000_40.xml -&#45;exclude 10.0.0.1,10.0.0.2 -Pn -&#45;max-retries 0 -&#45;max-rtt-timeout 1000ms 10.0.0.0/22" start="1602411071" startstr="Sun Oct 11 10:11:11 2020" version="6.40" xmloutputversion="1.04">
+<scaninfo type="syn" protocol="tcp" numservices="9000" services="1-9000"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1602411071" endtime="1602411099"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.3" addrtype="ipv4"/>
+<address addr="AA:20:A9:4B:5E:8A" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="4628">
+<extrareasons reason="no-responses" count="4628"/>
+</extraports>
+<extraports state="closed" count="4368">
+<extrareasons reason="resets" count="4368"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="512"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="exec" method="table" conf="3"/></port>
+<port protocol="tcp" portid="513"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="login" method="table" conf="3"/></port>
+<port protocol="tcp" portid="2121"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ccproxy-ftp" method="table" conf="3"/></port>
+</ports>
+<times srtt="2071" rttvar="16" to="100000"/>
+</host>
+<host starttime="1602411071" endtime="1602411099"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.4" addrtype="ipv4"/>
+<address addr="D2:03:AB:31:23:03" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="4697">
+<extrareasons reason="no-responses" count="4697"/>
+</extraports>
+<extraports state="closed" count="4295">
+<extrareasons reason="resets" count="4295"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="512"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="exec" method="table" conf="3"/></port>
+<port protocol="tcp" portid="514"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="shell" method="table" conf="3"/></port>
+<port protocol="tcp" portid="1099"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="rmiregistry" method="table" conf="3"/></port>
+<port protocol="tcp" portid="2121"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ccproxy-ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="3632"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="distccd" method="table" conf="3"/></port>
+<port protocol="tcp" portid="5432"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="postgresql" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6000"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="X11" method="table" conf="3"/></port>
+</ports>
+<times srtt="3113" rttvar="26" to="100000"/>
+</host>
+<host starttime="1602411071" endtime="1602411099"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.5" addrtype="ipv4"/>
+<address addr="BE:5B:EC:AE:61:61" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="4673">
+<extrareasons reason="no-responses" count="4673"/>
+</extraports>
+<extraports state="closed" count="4324">
+<extrareasons reason="resets" count="4324"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="2121"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ccproxy-ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="5432"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="postgresql" method="table" conf="3"/></port>
+</ports>
+<times srtt="3079" rttvar="18" to="100000"/>
+</host>
+<host starttime="1602411071" endtime="1602411099"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.6" addrtype="ipv4"/>
+<address addr="3E:B9:86:69:AE:DC" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="4610">
+<extrareasons reason="no-responses" count="4610"/>
+</extraports>
+<extraports state="closed" count="4384">
+<extrareasons reason="resets" count="4384"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="513"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="login" method="table" conf="3"/></port>
+<port protocol="tcp" portid="1524"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ingreslock" method="table" conf="3"/></port>
+<port protocol="tcp" portid="2121"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ccproxy-ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8009"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ajp13" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8787"><state state="open" reason="syn-ack" reason_ttl="64"/></port>
+</ports>
+<times srtt="2082" rttvar="8" to="100000"/>
+</host>
+<host starttime="1602411071" endtime="1602411106"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.7" addrtype="ipv4"/>
+<address addr="D2:31:5D:1C:C7:D2" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="4836">
+<extrareasons reason="no-responses" count="4836"/>
+</extraports>
+<extraports state="closed" count="4151">
+<extrareasons reason="resets" count="4151"/>
+</extraports>
+<port protocol="tcp" portid="21"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ftp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="23"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="telnet" method="table" conf="3"/></port>
+<port protocol="tcp" portid="25"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="smtp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="111"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="rpcbind" method="table" conf="3"/></port>
+<port protocol="tcp" portid="445"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="microsoft-ds" method="table" conf="3"/></port>
+<port protocol="tcp" portid="513"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="login" method="table" conf="3"/></port>
+<port protocol="tcp" portid="514"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="shell" method="table" conf="3"/></port>
+<port protocol="tcp" portid="1099"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="rmiregistry" method="table" conf="3"/></port>
+<port protocol="tcp" portid="3306"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="mysql" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6000"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="X11" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8009"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ajp13" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8180"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="unknown" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8787"><state state="open" reason="syn-ack" reason_ttl="64"/></port>
+</ports>
+<times srtt="3081" rttvar="13" to="100000"/>
+</host>
+<runstats><finished time="1602411106" timestr="Sun Oct 11 10:11:46 2020" elapsed="34.97" summary="Nmap done at Sun Oct 11 10:11:46 2020; 1022 IP addresses (5 hosts up) scanned in 34.97 seconds" exit="success"/><hosts up="5" down="1017" total="1022"/>
+</runstats>
+</nmaprun>

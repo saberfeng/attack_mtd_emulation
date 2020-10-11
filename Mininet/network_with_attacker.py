@@ -138,7 +138,7 @@ def nmap_scanning(net, config):
         timeout_str = "0"
     else:
         timeout = "timeout {}".format(timeout_value)
-        timeout_str = timeout
+        timeout_str = timeout_value
     # scan type
     scan_type = config.get("nmap_scan_type")
     # ports discovered

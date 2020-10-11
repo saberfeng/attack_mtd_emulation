@@ -55,6 +55,7 @@ class FRVM(app_manager.RyuApp):
         # item -> ((rip, port), (vip, port))
         self.rip_to_vip = {}  # (rip, port) => (vip, port)
         self.allocate_vip(self.rip_to_vip)
+        self.clear_output_file()
         self.print_rip_to_vip()
 
         self.new_rip_to_vip = {} # next round
@@ -64,10 +65,14 @@ class FRVM(app_manager.RyuApp):
         self.started = time.time()
         self.timer.start()
         self.arp_buffer = {}
+    
+    def clear_output_file(self):
+        with open("rip_vip", "w") as f:
+            pass
 
     def print_rip_to_vip(self):
         metasploitable_vips = ""
-        with open("rip_vip", "a+") as f:
+        with open("rip_vip", "w") as f:
             f.write("\ntime: " + str(datetime.now()) + "\n")
             for item in self.rip_to_vip.items():
                 # print vips
