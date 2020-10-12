@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 6.40 scan initiated Mon Oct 12 21:12:18 2020 as: nmap -sS -p 1-9000 -oX nmap_Time600_ScansS_Port1-9000_49.xml -&#45;exclude 10.0.0.1,10.0.0.2 -Pn -&#45;max-retries 0 -&#45;max-rtt-timeout 1000ms 10.0.0.0/22 -->
+<nmaprun scanner="nmap" args="nmap -sS -p 1-9000 -oX nmap_Time600_ScansS_Port1-9000_49.xml -&#45;exclude 10.0.0.1,10.0.0.2 -Pn -&#45;max-retries 0 -&#45;max-rtt-timeout 1000ms 10.0.0.0/22" start="1602537138" startstr="Mon Oct 12 21:12:18 2020" version="6.40" xmloutputversion="1.04">
+<scaninfo type="syn" protocol="tcp" numservices="9000" services="1-9000"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1602537138" endtime="1602537346"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.13" addrtype="ipv4"/>
+<address addr="56:60:D5:1E:03:9A" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="9000">
+<extrareasons reason="no-responses" count="9000"/>
+</extraports>
+</ports>
+<times srtt="49167" rttvar="49167" to="245835"/>
+</host>
+<host starttime="1602537138" endtime="1602537702"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.14" addrtype="ipv4"/>
+<address addr="62:50:61:D2:9E:7B" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="8999">
+<extrareasons reason="no-responses" count="8999"/>
+</extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port>
+</ports>
+<times srtt="2721" rttvar="278" to="100000"/>
+</host>
+<host starttime="1602537138" endtime="1602537276"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.18" addrtype="ipv4"/>
+<address addr="BE:A1:F0:15:13:59" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="9000">
+<extrareasons reason="no-responses" count="9000"/>
+</extraports>
+</ports>
+<times srtt="25621" rttvar="25621" to="128105"/>
+</host>
+<host starttime="1602537138" endtime="1602537329"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.0.0.20" addrtype="ipv4"/>
+<address addr="56:60:D5:1E:03:9A" addrtype="mac"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="9000">
+<extrareasons reason="no-responses" count="9000"/>
+</extraports>
+</ports>
+<times srtt="25100" rttvar="25100" to="125500"/>
+</host>
