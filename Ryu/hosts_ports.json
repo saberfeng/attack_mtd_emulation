@@ -147,12 +147,33 @@
     ],
     "MTD_interval_scan":0,
     "single_port":false,
-    "mtd_time":600,
+    "mtd_time":300,
     "num_ports":10,
     "ports_discovered":true,
     "num_hosts":5,
 
-    "nmap_scan_type":"sS",
-    "nmap_time_out":600,
-    "nmap_port_discovered":false
+    "start_index":50,
+    "end_index":130,
+    "commands":[
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false
+        },
+        {
+            "nmap_scan_type":"sT",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false
+        },
+        {
+            "nmap_scan_type":"sU",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false
+        },
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":300,
+            "nmap_port_discovered":true
+        }
+    ]
 }

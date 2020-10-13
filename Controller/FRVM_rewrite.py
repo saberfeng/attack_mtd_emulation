@@ -206,7 +206,7 @@ class FRVM(app_manager.RyuApp):
             self.arp_route(msg) # change parameters
         elif ip_pkt:
             self.ip_route(msg)
-        print()
+        
     
     def learn_mac_address(self, msg):
         in_port = msg.match['in_port']
@@ -246,8 +246,6 @@ class FRVM(app_manager.RyuApp):
                 tcp_src=src_port,
                 tcp_dst=dst_port)
         elif proto == Proto_UDP:
-            print("*"*20)
-            print(ipv4_src, ipv4_dst, src_port, dst_port)
             return datapath.ofproto_parser.OFPMatch(
                 eth_type=0x0800,
                 ip_proto=17,
@@ -357,9 +355,7 @@ class FRVM(app_manager.RyuApp):
         if not group_id: 
             # add flood group
             group_id = self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, actions=actions)
-            # print("*"*20 + "\ngroup_id:{} datapath_id:{} src_ip:{} dst_ip:{}\n".format(group_id, msg.datapath.id, src_ip, dst_ip) + "*"*20)
             self.switch_flood_group_ids[str(msg.datapath.id).zfill(16)][in_port] = group_id # update mapping
-            # self.debug_print_group_ids()
         else:
             # update flood group to use latest vips
             self.add_or_mod_flood_group(msg, in_port, src_ip, dst_ip, src_port, dst_port, protocol, group_id, actions=actions)

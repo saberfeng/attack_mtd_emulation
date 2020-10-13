@@ -106,62 +106,94 @@ def start_network(net, config, is_containernet, mode):
     topo_helper.add_default_route(net, r1.IP())
     o1.cmd("ip route add default via 10.0.4.1")
 
-    # if is_containernet:
-    #     h6 = net.get('h6')
-    #     # start Metasploitable services
-    #     h6.cmd("/bin/services.sh")
-    #     # start openvas services
-    #     r1.cmd("openvas-mkcert -f \n\n\n\n\n\n\n")
-    #     r1.cmd("openvas-mkcert-client -i -n")
-    #     r1.cmd('openvasmd '+\
-    #         '--modify-scanner "08b69003-5fc2-4037-a479-93b440211c73" '+\
-    #         '--scanner-ca-pub /usr/local/var/lib/openvas/CA/cacert.pem '+\
-    #         '--scanner-key-pub  /usr/local/var/lib/openvas/CA/clientcert.pem '+\
-    #         '--scanner-key-priv /usr/local/var/lib/openvas/private/CA/clientkey.pem')
-    #     r1.cmd('service redis-server restart')
-    #     r1.cmd('/openvas/startup.sh & ')
-    #     # r1.cmd('route add -net 10.0.1.0 netmask 255.255.255.0 gw 10.0.2.1 o1-eth0')
-    # else:
-    #     # Opening udp ports
-    #     topo_helper.open_host_ports(net, config, "udp")
     configure_hosts(net, mode, config)
     generate_switch_connections_file(net)
     nmap_scanning(net, config)
     CLI(net)
     net.stop()
 
-def nmap_scanning(net, config):
+def get_command_params(raw_command, config):
     # timeout
-    timeout_value = config.get("nmap_time_out")
+    timeout_value = raw_command.get("nmap_time_out")
     if timeout_value == 0:
-        timeout = ""
-        timeout_str = "0"
+        timeout = {"cmd":"", "filename":"0"}
     else:
-        timeout = "timeout {}".format(timeout_value)
-        timeout_str = timeout_value
+        timeout = {
+            "cmd":"timeout {}".format(timeout_value),
+            "filename":timeout_value
+        }
     # scan type
-    scan_type = config.get("nmap_scan_type")
+    scan_type = {
+        "cmd":"-" + raw_command.get("nmap_scan_type"),
+        "filename":raw_command.get("nmap_scan_type"),
+    }
     # ports discovered
-    if config.get("nmap_port_discovered"):
+    if raw_command.get("nmap_port_discovered"):
         port_list = config.get("0")
-        ports = "-p {}".format(",".join(map(str, port_list)))
-        ports_str = "discovered"
+        ports = {
+            "cmd":"-p {}".format(",".join(map(str, port_list))),
+            "filename":"discovered",
+        }
     else:
-        ports = "-p 1-9000"
-        ports_str = "1-9000"
-    specifics = "--max-retries 0 --max-rtt-timeout 1000ms"
+        ports = {
+            "cmd":"-p 1-9000",
+            "filename":"1-9000",
+        }
+    return timeout, scan_type, ports
 
+def generate_commands(config):
+    raw_commands = config.get("commands")
+    commands = []
+    filenames = []
+    for raw_command in raw_commands:
+        timeout, scan_type, ports = get_command_params(raw_command, config)
+        filenames.append("nmap_Time{}_Scan{}_Port{}".format(
+            timeout.get("filename"), scan_type.get("filename"), ports.get("filename")))
+        commands.append("{} nmap {} {} -oX ".format(
+            timeout.get("cmd"), scan_type.get("cmd"), ports.get("cmd")))
+    return filenames, commands
+
+# def nmap_scanning(net, config):
+#     cmd_part2 = " --exclude 10.0.0.1,10.0.0.2 -Pn --max-retries 0 --max-rtt-timeout 1000ms 10.0.0.0/22"
+#     # cmd_part2 = " -Pn --max-retries 0 --max-rtt-timeout 1000ms 10.0.0.121"
+#     filenames, commands, timeout_value = generate_commands(config)
+    
+#     r1 = net.get('r1')
+#     for i in range(50):
+#         for j in range(len(commands)):
+#             complete_filename = filenames[j] + "_{}_{}.xml ".format(i,j)
+#             # command = commands[j] + complete_filename + cmd_part2 + " &"
+#             command = commands[j] + complete_filename + cmd_part2
+#         print(command)
+#         r1.cmd(command)
+#         #     r1.cmd("BACK_PID_{}=$!".format(j))
+#         # pids = ""
+#         # for j in range(len(commands)):
+#         #     pids += "$BACK_PID_{} ".format(j)
+#         # r1.cmd("wait {}".format(pids)) # wait until commands complete
+#         # time.sleep(timeout_value)
+#         topo_helper.remove_all_ARP_cache(net)
+
+def nmap_scanning(net, config):
+    cmd_part2 = " --exclude 10.0.0.1,10.0.0.2 -Pn --max-retries 0 --max-rtt-timeout 1000ms 10.0.0.0/22"
+    # cmd_part2 = " -Pn --max-retries 0 --max-rtt-timeout 1000ms 10.0.0.121"
+    filenames, commands = generate_commands(config)
+    
     r1 = net.get('r1')
-    for i in range(50):
-        file_name = "nmap_Time{}_Scan{}_Port{}_{}.xml".format(
-            timeout_str, scan_type, ports_str, i)
-        command = "{} nmap -{} {} -oX {} --exclude 10.0.0.1,10.0.0.2 -Pn {} 10.0.0.0/22".format(
-            timeout, scan_type, ports, file_name, specifics)
-        print(command)
-        r1.cmd(command)
-
-        # important
-        # topo_helper.delete_all_flows(net)
+    start_index = config.get("start_index")
+    end_index = config.get("end_index")
+    for i in range(start_index, end_index):
+        for j in range(len(commands)):
+            complete_filename = filenames[j] + "_{}.xml ".format(i)
+            command = commands[j] + complete_filename + cmd_part2 + " &"
+            # command = commands[j] + complete_filename + cmd_part2
+            print(command)
+            r1.cmd(command)
+            r1.cmd("BACK_PID_{}=$!".format(j))
+        pids = ""
+        for j in range(len(commands)):
+            pids += "$BACK_PID_{} ".format(j)
+        r1.cmd("wait {}".format(pids)) # wait until commands complete
         topo_helper.remove_all_ARP_cache(net)
 
 
