@@ -152,28 +152,35 @@
     "ports_discovered":true,
     "num_hosts":5,
 
-    "start_index":50,
-    "end_index":130,
+    "parallel_commands_num":8,
     "commands":[
         {
             "nmap_scan_type":"sS",
             "nmap_time_out":300,
-            "nmap_port_discovered":false
+            "nmap_port_discovered":false,
+            "start_index":389,
+            "end_index":629
         },
         {
             "nmap_scan_type":"sT",
             "nmap_time_out":300,
-            "nmap_port_discovered":false
+            "nmap_port_discovered":false,
+            "start_index":389,
+            "end_index":629
         },
         {
             "nmap_scan_type":"sU",
             "nmap_time_out":300,
-            "nmap_port_discovered":false
+            "nmap_port_discovered":false,
+            "start_index":389,
+            "end_index":629
         },
         {
             "nmap_scan_type":"sS",
             "nmap_time_out":300,
-            "nmap_port_discovered":true
+            "nmap_port_discovered":true,
+            "start_index":389,
+            "end_index":629
         }
     ]
 }
