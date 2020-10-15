@@ -147,40 +147,40 @@
     ],
     "MTD_interval_scan":0,
     "single_port":false,
-    "mtd_time":300,
+    "mtd_time":200,
     "num_ports":10,
     "ports_discovered":true,
     "num_hosts":5,
 
-    "parallel_commands_num":8,
+    "parallel_commands_num":10,
     "commands":[
         {
             "nmap_scan_type":"sS",
-            "nmap_time_out":300,
+            "nmap_time_out":200,
             "nmap_port_discovered":false,
-            "start_index":389,
-            "end_index":629
+            "start_index":50,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sT",
-            "nmap_time_out":300,
+            "nmap_time_out":200,
             "nmap_port_discovered":false,
-            "start_index":389,
-            "end_index":629
+            "start_index":50,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sU",
-            "nmap_time_out":300,
+            "nmap_time_out":200,
             "nmap_port_discovered":false,
-            "start_index":389,
-            "end_index":629
+            "start_index":50,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sS",
-            "nmap_time_out":300,
+            "nmap_time_out":200,
             "nmap_port_discovered":true,
-            "start_index":389,
-            "end_index":629
+            "start_index":50,
+            "end_index": 700
         }
     ]
 }

@@ -1,0 +1,32 @@
+
+
+300:
+next actions: 
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false,
+            "start_index":778,
+            "end_index": @@@@
+        },
+        {
+            "nmap_scan_type":"sT",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false,
+            "start_index":778,
+            "end_index": @@@@
+        },
+        {
+            "nmap_scan_type":"sU",
+            "nmap_time_out":300,
+            "nmap_port_discovered":false,
+            "start_index":778,
+            "end_index": @@@@
+        },
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":300,
+            "nmap_port_discovered":true,
+            "start_index":778,
+            "end_index": @@@@
+        }

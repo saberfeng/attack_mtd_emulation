@@ -178,9 +178,9 @@ def nmap_scanning(net, config):
             r1.cmd(command)
             print(command)
             r1.cmd("BACK_PID_{}=$!".format(index))
-            r1.cmd("sleep 0.8")
-        # remaining time
-        remaining_seconds = int((mtd_time * len(all_commands))/5)
+            r1.cmd("sleep 1")
+        # remaining time 
+        remaining_seconds = int((mtd_time * len(all_commands))/parallel_commands_num)
         left_hours = int(remaining_seconds/3600)
         minutes = int((remaining_seconds - left_hours*3600)/60)
         print("     remaining time:{}h{}m".format(left_hours, minutes))
@@ -191,7 +191,7 @@ def nmap_scanning(net, config):
             pids += "$BACK_PID_{} ".format(index)
         r1.cmd("wait {}".format(pids)) 
         # clear arp cache
-        topo_helper.remove_all_ARP_cache(net)
+        # topo_helper.remove_all_ARP_cache(net)
     else:
         print("*"*30)
         print((("*"+" "*28+"*\n")*3)[0:-1])
