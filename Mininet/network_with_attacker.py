@@ -178,7 +178,7 @@ def nmap_scanning(net, config):
             r1.cmd(command)
             print(command)
             r1.cmd("BACK_PID_{}=$!".format(index))
-            r1.cmd("sleep 1")
+            r1.cmd("sleep 1.5")
         # remaining time 
         remaining_seconds = int((mtd_time * len(all_commands))/parallel_commands_num)
         left_hours = int(remaining_seconds/3600)

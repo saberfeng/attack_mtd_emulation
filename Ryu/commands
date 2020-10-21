@@ -1,32 +1,94 @@
 
-
-300:
-next actions: 
+done:
         {
             "nmap_scan_type":"sS",
-            "nmap_time_out":300,
+            "nmap_time_out":100,
             "nmap_port_discovered":false,
-            "start_index":778,
-            "end_index": @@@@
+            "start_index":422,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sT",
-            "nmap_time_out":300,
+            "nmap_time_out":100,
             "nmap_port_discovered":false,
-            "start_index":778,
-            "end_index": @@@@
+            "start_index":422,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sU",
-            "nmap_time_out":300,
+            "nmap_time_out":100,
             "nmap_port_discovered":false,
-            "start_index":778,
-            "end_index": @@@@
+            "start_index":422,
+            "end_index": 700
         },
         {
             "nmap_scan_type":"sS",
-            "nmap_time_out":300,
+            "nmap_time_out":100,
             "nmap_port_discovered":true,
-            "start_index":778,
-            "end_index": @@@@
+            "start_index":422,
+            "end_index": 700
+        }
+
+
+
+500:
+next actions: 
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":500,
+            "nmap_port_discovered":false,
+            "start_index":62,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sT",
+            "nmap_time_out":500,
+            "nmap_port_discovered":false,
+            "start_index":62,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sU",
+            "nmap_time_out":500,
+            "nmap_port_discovered":false,
+            "start_index":62,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":500,
+            "nmap_port_discovered":true,
+            "start_index":62,
+            "end_index": 300
+        }
+
+400:
+next:
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":400,
+            "nmap_port_discovered":false,
+            "start_index":16,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sT",
+            "nmap_time_out":400,
+            "nmap_port_discovered":false,
+            "start_index":16,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sU",
+            "nmap_time_out":400,
+            "nmap_port_discovered":false,
+            "start_index":16,
+            "end_index": 300
+        },
+        {
+            "nmap_scan_type":"sS",
+            "nmap_time_out":400,
+            "nmap_port_discovered":true,
+            "start_index":16,
+            "end_index": 300
         }
